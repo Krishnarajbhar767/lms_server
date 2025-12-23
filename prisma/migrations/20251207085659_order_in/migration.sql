@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Lesson" ADD COLUMN     "order" INTEGER NOT NULL DEFAULT 1;
+
+-- AlterTable
+ALTER TABLE "Section" ADD COLUMN     "order" INTEGER NOT NULL DEFAULT 1;

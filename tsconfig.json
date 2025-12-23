@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    // "target": "es202",
+    // "module": "CommonJS",
+    // "moduleResolution": "node",
+    "module": "commonjs",
+    "target": "ES2019",
+    "moduleResolution": "node",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    /* Strictness */
+    "strict": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": false,
+    // "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    /* Interop / imports */
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    /* Safety */
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    /* Debugging */
+    "sourceMap": true
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

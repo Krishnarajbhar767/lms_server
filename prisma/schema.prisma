@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 Int              @id @default(autoincrement())
+  firstName          String
+  lastName           String
+  email              String           @unique
+  password           String
+  role               Role             @default(STUDENT)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  isActive           Boolean          @default(false)
+  passwordResetToken String? // verification token for forgot password
+  certificates       Certificate[]
+  progress           CourseProgress[]
+  enrollments        Enrollment[]
+  payments           Payment[]
+  reviews            Review[]
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String
+  courses     Course[]
+}
+
+model Course {
+  id           Int              @id @default(autoincrement())
+  title        String           @unique
+  description  String
+  price        Float
+  status       CourseStatus     @default(DRAFT)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  categoryId   Int?
+  thumbnail    String
+  language     String
+  certificates Certificate[]
+  category     Category?        @relation(fields: [categoryId], references: [id])
+  progress     CourseProgress[]
+  enrollments  Enrollment[]
+  payments     Payment[]
+  reviews      Review[]
+  sections     Section[]
+}
+
+model Section {
+  id       Int      @id @default(autoincrement())
+  title    String
+  courseId Int
+  lessons  Lesson[]
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  order    Int      @default(1)
+}
+
+model Lesson {
+  id           Int        @id @default(autoincrement())
+  title        String
+  bunnyVideoId String
+  duration     Int // stored as minutes 
+  sectionId    Int
+  resource     Resource[]
+  section      Section    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  order        Int        @default(1)
+}
+
+model Resource {
+  id       Int    @id @default(autoincrement())
+  name     String
+  url      String
+  lessonId Int
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+model Enrollment {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  courseId  Int
+  createdAt DateTime @default(now())
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment   Payment?
+
+  @@unique([userId, courseId])
+}
+
+model Payment {
+  id           Int             @id @default(autoincrement())
+  amount       Float
+  provider     PaymentProvider
+  status       PaymentStatus   @default(PENDING)
+  createdAt    DateTime        @default(now())
+  userId       Int
+  courseId     Int
+  enrollmentId Int             @unique
+  course       Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  enrollment   Enrollment      @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CourseProgress {
+  id         Int    @id @default(autoincrement())
+  userId     Int
+  courseId   Int
+  percentage Float  @default(0)
+  course     Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+}
+
+model Certificate {
+  id       Int      @id @default(autoincrement())
+  userId   Int
+  courseId Int
+  pdfUrl   String
+  issuedAt DateTime @default(now())
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?
+  userId    Int
+  courseId  Int
+  createdAt DateTime @default(now())
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+enum PaymentProvider {
+  RAZORPAY
+  PHONEPE
+  CASHFREE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
