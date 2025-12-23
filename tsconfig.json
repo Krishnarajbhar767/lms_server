@@ -7,7 +7,7 @@
     "target": "ES2019",
     "moduleResolution": "node",
     "rootDir": "./src",
-    "outDir": "./dist",
+    "outDir": "dist",
     /* Strictness */
     "strict": true,
     "noImplicitReturns": true,

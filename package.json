@@ -2,7 +2,7 @@
   "name": "lms_server",
   "version": "1.0.0",
   "description": "A Learning Management System (LMS) built with Node.js, Express, TypeScript, Prisma and PostgreSQL, supporting Admin and Student roles with multiple payment gateway integrations for secure course enrollment and management.",
-  "main": "index.ts",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
