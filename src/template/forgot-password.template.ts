@@ -144,7 +144,7 @@ export const forgotPasswordTemplate = (
                         ${forgotPasswordLink}
                     </div>
                     <div class="warning">
-                        ⏱️ This password reset link will expire in 1 hour. For security reasons, please do not share this link with anyone.
+                        ⏱️ This password reset link will expire in 15 minutes. For security reasons, please do not share this link with anyone.
                     </div>
                     <hr class="divider">
                     <p class="message" style="margin-bottom: 10px; font-size: 13px;">

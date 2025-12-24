@@ -18,8 +18,11 @@ export const register = asyncHandler(async (req: Request<{}, {}, RegisterDTO>, r
     const { firstName, lastName, email, password } = req.body;
     // step 1 : check if user already exists
     const existingUser = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-    if (existingUser) {
+    if (existingUser && existingUser.isActive) {
         throw new ApiError(400, 'Email already exists');
+    }
+    if (existingUser && !existingUser.isActive) {
+        throw new ApiError(400, 'Please verify your email to activate your account. Check your inbox for verification email');
     }
     // step 2 : hash password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -39,8 +42,13 @@ export const register = asyncHandler(async (req: Request<{}, {}, RegisterDTO>, r
     const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
     // step 6 : generate email template
     const emailTemplate = accountVerificationTemplate({ firstName: user.firstName, verificationLink })    // step 8 : send email
-    // not using await here to avoid blocking
-    sendMail(user.email, 'Account Verification', emailTemplate);
+    try {
+        await sendMail(user.email, 'Account Verification', emailTemplate);
+    } catch (error) {
+        // if email fails to send, delete user
+        await prisma.user.delete({ where: { id: user.id } });
+        throw new ApiError(500, 'Failed to send verification email. Please try again later');
+    }
     res.success('User registered successfully', 201);
 });
 
@@ -187,17 +195,23 @@ export const changePassword = asyncHandler(async (req: Request<{}, {}, ChangePas
 
 export const forgotPasswordRequest = asyncHandler(async (req: Request<{}, {}, ForgotPasswordDTO>, res: Response) => {
     const { email } = req.body;
+
     // step 1 : find user by email
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user) {
         throw new ApiError(404, 'User not found');
     }
+    // check if user is active
+    if (!user.isActive) {
+        throw new ApiError(403, 'Please verify your email to reset your password');
+    }
     // step 2 : generate forgot password token
     const passwordResetToken = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
         process.env.FORGOT_PASSWORD_SECRET as string,
-        { expiresIn: '1h' }
+        { expiresIn: '15m' }
     );
+
     // step 3 : update user's forgot password token
     await prisma.user.update({ where: { email: user.email }, data: { passwordResetToken } });
     // step 4 : generate forgot password link
