@@ -1,0 +1,62 @@
+
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Agent Answer</title>
+          <style>
+            body {
+              font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              line-height: 1.6;
+              max-width: 800px;
+              margin: 0 auto;
+              padding: 20px;
+              color: #121212;
+            }
+            h1, h2, h3, h4, h5, h6 {
+              font-family: 'Bricolage Grotesque', sans-serif;
+              color: #121212;
+              margin-top: 24px;
+              margin-bottom: 12px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 16px 0;
+            }
+            th, td {
+              border: 1px solid #AAAAAA;
+              padding: 8px;
+              text-align: left;
+            }
+            th {
+                          background-color: #F2F5FF;
+              font-weight: 600;
+              color: #001040;
+            }
+            code {
+              background-color: #F2F5FF;
+              padding: 2px 4px;
+              border-radius: 3px;
+            }
+            pre {
+              background-color: #F2F5FF;
+              padding: 12px;
+              border-radius: 6px;
+              overflow-x: auto;
+            }
+            blockquote {
+              border-left: 4px solid #2979FF;
+              margin: 16px 0;
+              padding-left: 16px;
+              color: #606060;
+            }
+          </style>
+        </head>
+        <body>
+          <div>
+            <div>Generated on 12/8/2025, 1:24:40 PM</div>
+          </div>
+          <div id="content"><p>Hello! I am realm dq.ai service, ready to assist you. I have access to information such as details about a Dummy PDF download <sup class="citation-badge" data-page="1">1</sup>. How can I help you today?</p></div>
+        </body>
+      </html>
+    

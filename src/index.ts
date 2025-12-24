@@ -21,6 +21,8 @@ dotenv.config();
 const app = express();
 // use express file upload for get file from user
 app.use(fileUpload({
+  useTempFiles: true,
+  tempFileDir: '/tmp/',
   limits: {
     // allow user to upload  max  10 mb thumbnail
     fileSize: 1024 * 1024 * 10,

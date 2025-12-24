@@ -101,8 +101,8 @@ export const uploadResource = asyncHandler(async (req: any, res: Response) => {
     }
 
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(resourceFile.name);
-    const fileName = `resource-${uniqueSuffix}${ext}`;
+    const originalName = resourceFile.name.replace(/[^\w.-]/g, "_");
+    const fileName = `resource-${uniqueSuffix}-${originalName}`;
     const filePath = path.join(uploadDir, fileName);
 
     try {
@@ -116,30 +116,75 @@ export const uploadResource = asyncHandler(async (req: any, res: Response) => {
         throw new ValidationError("Failed to upload resource");
     }
 
-    const resourceUrl = `${process.env.BACKEND_URL}/resource/${fileName}`;
+    const backendUrl = process.env.BACKEND_URL?.trim() || "http://localhost:6572";
+    const resourceUrl = `${backendUrl}/resource/${fileName}`;
     res.success("Resource uploaded successfully", { resourceUrl }, 200);
 });
 
 
 export const deleteResource = asyncHandler(async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
+    const resourceId = Number(id);
+
     const resource = await prisma.resource.findUnique({
-        where: { id: Number(id) },
+        where: { id: resourceId },
+        include: { lesson: { include: { section: true } } }
     });
     if (!resource) {
         throw new ValidationError("Resource not found");
     }
-    // Extract just the filename in case a full URL is stored
+
+    const courseId = resource.lesson.section.courseId;
+
+    // 1. Delete File from Storage
     const fileName = path.basename(resource.url);
     const filePath = path.join(process.cwd(), "resource", fileName);
     if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
     }
+
+    // 2. Delete Record
     await prisma.resource.delete({
-        where: { id: Number(id) },
+        where: { id: resourceId },
+    });
+
+    // 3. Clear Cache
+    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX);
+    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX);
+
+    // 4. Return Latest Course
+    const course = await prisma.course.findUnique({
+        where: { id: courseId },
+        include: {
+            sections: {
+                include: {
+                    lessons: {
+                        include: {
+                            resource: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    res.success("Resource deleted successfully", course, 200);
+});
+export const deleteResourceFile = asyncHandler(async (req: Request<{ resourceUrl: string }>, res: Response) => {
+    // delete only given resource url delete only resource file not table  and if any resource.url is using same url then make them blank
+    // Extract just the filename in case a full URL is stored
+    const { resourceUrl } = req?.body;
+    const fileName = path.basename(resourceUrl);
+    const filePath = path.join(process.cwd(), "resource", fileName);
+    if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+    }
+    await prisma.resource.updateMany({
+        where: { url: resourceUrl },
+        data: { url: "" },
     });
     res.success("Resource deleted successfully", {}, 200);
-});
+})
 
 // delete lesson with complete cleanup bunny video to resource
 export const deleteLesson = asyncHandler(async (req: Request<{ id: string }>, res: Response) => {
@@ -265,3 +310,102 @@ export const reorderLessons = asyncHandler(
         }
     }
 );
+
+export const updateLesson = asyncHandler(async (req: Request<{ id: string }>, res: Response) => {
+    const { id } = req.params;
+    const { title, bunnyVideoId, duration, resource } = req.body;
+    const lessonId = Number(id);
+
+    if (Number.isNaN(lessonId)) {
+        throw new ValidationError("Invalid lesson id");
+    }
+
+    const existingLesson = await prisma.lesson.findUnique({
+        where: { id: lessonId },
+        include: { resource: true }
+    });
+
+    if (!existingLesson) {
+        throw new ValidationError("Lesson not found");
+    }
+
+    const oldBunnyVideoId = existingLesson.bunnyVideoId;
+    const oldResources = existingLesson.resource;
+
+    // 1. Update Database
+    const updatedLesson = await prisma.lesson.update({
+        where: { id: lessonId },
+        data: {
+            title: title || existingLesson.title,
+            bunnyVideoId: bunnyVideoId || existingLesson.bunnyVideoId,
+            duration: duration !== undefined ? duration : existingLesson.duration,
+        },
+    });
+
+    // 2. Handle Resource Update
+    const currentResourceUrl = (existingLesson.resource && existingLesson.resource.length > 0) ? existingLesson?.resource?.[0]?.url : "";
+    if (resource && resource !== currentResourceUrl) {
+        // Delete old resource entries if any
+        if (oldResources.length > 0) {
+            for (const oldRes of oldResources) {
+                const fileName = path.basename(oldRes.url);
+                const filePath = path.join(process.cwd(), "resource", fileName);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            }
+            await prisma.resource.deleteMany({
+                where: { lessonId: lessonId }
+            });
+        }
+
+        // Create new resource entry
+        await prisma.resource.create({
+            data: {
+                name: updatedLesson.title,
+                url: resource,
+                lessonId: lessonId,
+            },
+        });
+    }
+
+    // 3. Cleanup Old Video from Bunny if it has changed
+    if (bunnyVideoId && oldBunnyVideoId && bunnyVideoId !== oldBunnyVideoId) {
+        try {
+            await deleteBunnyVideo(oldBunnyVideoId);
+            logger.info(`Deleted old bunny video: ${oldBunnyVideoId}`);
+        } catch (error) {
+            logger.error(`Failed to delete old bunny video: ${oldBunnyVideoId}`, error);
+        }
+    }
+
+    // 4. Return Latest Course Data
+    const section = await prisma.section.findUnique({
+        where: { id: existingLesson.sectionId },
+        select: { courseId: true }
+    });
+
+    if (!section || !section.courseId) {
+        throw new ValidationError("Course not found for this lesson");
+    }
+
+    const course = await prisma.course.findUnique({
+        where: { id: section.courseId },
+        include: {
+            sections: {
+                include: {
+                    lessons: {
+                        include: {
+                            resource: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX);
+    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX);
+
+    return res.success("Lesson updated successfully", course, 200);
+});
