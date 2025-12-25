@@ -59,6 +59,32 @@ model Section {
   lessons  Lesson[]
   course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   order    Int      @default(1)
+  quize    Quize?
+}
+
+// Here Is All Schema For Smooth Quizzes That Belong to  Section one section contain only one Quize  and Quize  Contain  Many Questions And Thair  Option
+model Quize {
+  id        Int        @id @default(autoincrement())
+  title     String
+  sectionId Int        @unique
+  section   Section    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  questions Question[]
+}
+
+model Question {
+  id      Int      @id @default(autoincrement())
+  title   String
+  quizeId Int
+  options Option[]
+  quize   Quize    @relation(fields: [quizeId], references: [id], onDelete: Cascade)
+}
+
+model Option {
+  id         Int      @id @default(autoincrement())
+  title      String
+  isCorrect  Boolean  @default(false)
+  questionId Int
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
 
 model Lesson {
