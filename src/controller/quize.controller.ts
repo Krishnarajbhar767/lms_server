@@ -10,6 +10,8 @@ export const upsertQuize = asyncHandler(
         const validatedData = upsertQuizeSchema.parse(req.body);
         const { sectionId, title, questions } = validatedData;
 
+        logger.info(`Starting quiz upsert for section ${sectionId}`, { title, questionCount: questions.length });
+
         // Check if section exists
         const section = await prisma.section.findUnique({
             where: { id: sectionId }
@@ -38,12 +40,14 @@ export const upsertQuize = asyncHandler(
 
             let currentQuize;
             if (existingQuize) {
+                logger.info(`Updating existing quiz ${existingQuize.id} for section ${sectionId}`);
                 // Update the existing Quize
                 currentQuize = await tx.quize.update({
                     where: { id: existingQuize.id },
                     data: { title }
                 });
             } else {
+                logger.info(`Creating new quiz for section ${sectionId}`);
                 // Create a new Quize
                 currentQuize = await tx.quize.create({
                     data: { title, sectionId }
@@ -84,6 +88,7 @@ export const upsertQuize = asyncHandler(
         });
 
         const message = questions.length === 0 ? "Quiz removed successfully" : "Quiz saved successfully";
+        logger.info(`Quiz upsert completed for section ${sectionId}`, { message });
         return res.success(message, quize, 201);
     }
 );
