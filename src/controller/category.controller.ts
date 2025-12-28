@@ -87,22 +87,25 @@ const getAllCategories = asyncHandler(async (req: Request, res: Response) => {
     const cachedCategories = await cache.get(cacheKey);
 
     if (cachedCategories) {
-        return res.success('Categories fetched successfully', cachedCategories, 200);
+        return res.success('Categories fetched successfully cached', cachedCategories, 200);
     }
 
-    // Only return categories that have at least one course
+    // Only return categories that have at least one PUBLISHED course (public endpoint)
     const categories = await prisma.category.findMany({
         where: {
             courses: {
                 some: {
-                    // Just check existence for now, can add status filter later if needed
-                    id: { gt: 0 }
+                    status: 'PUBLISHED'
                 }
             }
         },
         include: {
             _count: {
-                select: { courses: true }
+                select: {
+                    courses: {
+                        where: { status: 'PUBLISHED' }
+                    }
+                }
             }
         },
         orderBy: {
@@ -111,7 +114,7 @@ const getAllCategories = asyncHandler(async (req: Request, res: Response) => {
     });
 
     cache.set(cacheKey, categories);
-    res.success('Categories fetched successfully', categories, 200);
+    res.success('Categories fetched successfully uncached', categories, 200);
 })
 
 // Admin Endpoint - Returns ALL categories

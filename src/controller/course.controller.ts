@@ -156,19 +156,48 @@ export const getAllCoursesForAdmin = asyncHandler(async (req: Request, res: Resp
 export const getAllCoursesForStudent = asyncHandler(async (req: Request, res: Response) => {
     const page = Number(req.query.page) || 1
     const limit = Number(req.query.limit) || 10
+    const search = req.query.search as string | undefined
+    const categoryId = req.query.categoryId as string | undefined
+    const sortBy = (req.query.sortBy as string) || "new"
+
     const skip = (page - 1) * limit
 
-    const cacheKey = `${COURSE_CACHE_PREFIX}p${page}_l${limit}`
+    // Build cache key with all params
+    const cacheKey = `${COURSE_CACHE_PREFIX}p${page}_l${limit}_s${search || ""}_c${categoryId || ""}_sb${sortBy}`
     const cache_data = await cache.get(cacheKey)
     if (cache_data) {
-        return res.success("Courses fetched successfully", cache_data)
+        return res.success("Courses fetched successfully cache", cache_data)
     }
 
-    const where = { status: "PUBLISHED" as const }
+    // Build where clause
+    const where: {
+        status: "PUBLISHED";
+        categoryId?: number;
+        OR?: { title?: { contains: string; mode: "insensitive" }; description?: { contains: string; mode: "insensitive" } }[];
+    } = { status: "PUBLISHED" }
+
+    if (categoryId) {
+        where.categoryId = Number(categoryId)
+    }
+
+    if (search) {
+        where.OR = [
+            { title: { contains: search, mode: "insensitive" } },
+            { description: { contains: search, mode: "insensitive" } }
+        ]
+    }
+
+    // Build orderBy clause
+    let orderBy: object[] = [{ createdAt: "desc" }]
+    if (sortBy === "popular" || sortBy === "trending") {
+        orderBy = [{ enrollments: { _count: "desc" } }, { createdAt: "desc" }]
+    }
+
     const [courses, totalCourses] = await Promise.all([
         prisma.course.findMany({
             where,
             include: {
+                category: true,
                 sections: {
                     orderBy: { order: "asc" },
                     include: {
@@ -178,9 +207,11 @@ export const getAllCoursesForStudent = asyncHandler(async (req: Request, res: Re
                         },
                     },
                 },
+                _count: { select: { enrollments: true } }
             },
             skip,
-            take: limit
+            take: limit,
+            orderBy
         }),
         prisma.course.count({ where })
     ])
@@ -198,6 +229,13 @@ export const getAllCoursesForStudent = asyncHandler(async (req: Request, res: Re
 
     cache.set(cacheKey, responseData)
     res.success("Courses fetched successfully", responseData)
+})
+
+// Clear all cache - Admin only
+export const clearAllCache = asyncHandler(async (_req: Request, res: Response) => {
+    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
+    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX)
+    res.success("All cache cleared successfully", null)
 })
 
 export const getCourseById = asyncHandler(async (req: Request<{ id: string }>, res: Response) => {
