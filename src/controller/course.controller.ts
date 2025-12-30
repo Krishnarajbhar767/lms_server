@@ -63,12 +63,22 @@ export const uploadThumbnailController = asyncHandler(async (req: FileUploadRequ
 })
 
 export const createCourse = asyncHandler(async (req: Request<{}, {}, CreateCourseDto>, res: Response) => {
-    const { title, description, price, categoryId, thumbnail, language } = req.body;
+    const { title, description, price, originalPrice, categoryId, thumbnail, language } = req.body;
     const isExistingCourse = await prisma.course.findUnique({ where: { title: title.toLowerCase().trim() } })
     if (isExistingCourse) {
         throw new ValidationError('Course already exists with this exact title')
     }
-    const course = await prisma.course.create({ data: { title: title.toLowerCase().trim(), description: description.toLowerCase().trim(), price, categoryId, thumbnail, language: language.toLowerCase().trim() } })
+    const course = await prisma.course.create({
+        data: {
+            title: title.toLowerCase().trim(),
+            description: description.toLowerCase().trim(),
+            price,
+            originalPrice: originalPrice || null,
+            categoryId,
+            thumbnail,
+            language: language.toLowerCase().trim()
+        }
+    })
 
     // clear all cache related to courses when new course is created
     clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
@@ -79,13 +89,23 @@ export const createCourse = asyncHandler(async (req: Request<{}, {}, CreateCours
 
 export const updateCourse = asyncHandler(async (req: Request<{ id: string }, {}, CreateCourseDto>, res: Response) => {
     const { id } = req.params;
-    const { title, description, price, categoryId, thumbnail } = req.body;
+    const { title, description, price, originalPrice, categoryId, thumbnail } = req.body;
     // check with this title course is already exists.
     const isExistingCourse = await prisma.course.findUnique({ where: { title: title.toLowerCase().trim() } })
     if (isExistingCourse && isExistingCourse.id !== Number(id)) {
         throw new ValidationError('Another course already exists with this exact title')
     }
-    const course = await prisma.course.update({ where: { id: Number(id) }, data: { title: title.toLowerCase().trim(), description: description.toLowerCase().trim(), price, categoryId, thumbnail } })
+    const course = await prisma.course.update({
+        where: { id: Number(id) },
+        data: {
+            title: title.toLowerCase().trim(),
+            description: description.toLowerCase().trim(),
+            price,
+            originalPrice: originalPrice || null,
+            categoryId,
+            thumbnail
+        }
+    })
 
     // clear all cache related to courses when course is updated
     clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
