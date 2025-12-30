@@ -10,8 +10,8 @@ import { cache, clearCacheByPrefix, COURSE_ADMIN_CACHE_PREFIX, COURSE_CACHE_PREF
 import { logger } from "../config/logger.config";
 import { deleteBunnyVideo } from "../utils/delete-bunny-video";
 
-export const createLesson = asyncHandler(async (req: Request<{}, {}, CreateLessonDto>, res: Response) => {
-    const { title, bunnyVideoId, duration, sectionId, resource } = req.body;
+export const createLesson = asyncHandler(async (req: Request<{}, {}, CreateLessonDto & { resources?: { name: string, url: string }[] }>, res: Response) => {
+    const { title, bunnyVideoId, duration, sectionId, resources } = req.body;
 
     const normalizedTitle = title?.trim().toLowerCase();
     const sectionIdNum = Number(sectionId);
@@ -50,14 +50,14 @@ export const createLesson = asyncHandler(async (req: Request<{}, {}, CreateLesso
             order: nextOrder,
         },
     });
-    // create resource for this  lesson if resource exist
-    if (resource) {
-        await prisma.resource.create({
-            data: {
-                name: lesson.title,
-                url: resource,
+    // create resource for this  lesson if resources exist
+    if (resources && resources.length > 0) {
+        await prisma.resource.createMany({
+            data: resources.map(res => ({
+                name: res.name,
+                url: res.url,
                 lessonId: lesson.id,
-            },
+            }))
         });
     }
     // now send  latest Course Data
@@ -313,7 +313,7 @@ export const reorderLessons = asyncHandler(
 
 export const updateLesson = asyncHandler(async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
-    const { title, bunnyVideoId, duration, resource } = req.body;
+    const { title, bunnyVideoId, duration, newResources } = req.body;
     const lessonId = Number(id);
 
     if (Number.isNaN(lessonId)) {
@@ -330,9 +330,8 @@ export const updateLesson = asyncHandler(async (req: Request<{ id: string }>, re
     }
 
     const oldBunnyVideoId = existingLesson.bunnyVideoId;
-    const oldResources = existingLesson.resource;
 
-    // 1. Update Database
+    // 1. Update Lesson Details
     const updatedLesson = await prisma.lesson.update({
         where: { id: lessonId },
         data: {
@@ -342,30 +341,14 @@ export const updateLesson = asyncHandler(async (req: Request<{ id: string }>, re
         },
     });
 
-    // 2. Handle Resource Update
-    const currentResourceUrl = (existingLesson.resource && existingLesson.resource.length > 0) ? existingLesson?.resource?.[0]?.url : "";
-    if (resource && resource !== currentResourceUrl) {
-        // Delete old resource entries if any
-        if (oldResources.length > 0) {
-            for (const oldRes of oldResources) {
-                const fileName = path.basename(oldRes.url);
-                const filePath = path.join(process.cwd(), "resource", fileName);
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
-                }
-            }
-            await prisma.resource.deleteMany({
-                where: { lessonId: lessonId }
-            });
-        }
-
-        // Create new resource entry
-        await prisma.resource.create({
-            data: {
-                name: updatedLesson.title,
-                url: resource,
+    // 2. Add New Resources if provided
+    if (newResources && newResources.length > 0) {
+        await prisma.resource.createMany({
+            data: newResources.map((res: any) => ({
+                name: res.name,
+                url: res.url,
                 lessonId: lessonId,
-            },
+            }))
         });
     }
 
