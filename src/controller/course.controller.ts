@@ -63,7 +63,7 @@ export const uploadThumbnailController = asyncHandler(async (req: FileUploadRequ
 })
 
 export const createCourse = asyncHandler(async (req: Request<{}, {}, CreateCourseDto>, res: Response) => {
-    const { title, description, price, originalPrice, categoryId, thumbnail, language } = req.body;
+    const { title, description, price, originalPrice, categoryId, thumbnail, language, whatYouWillLearn } = req.body;
     const isExistingCourse = await prisma.course.findUnique({ where: { title: title.toLowerCase().trim() } })
     if (isExistingCourse) {
         throw new ValidationError('Course already exists with this exact title')
@@ -76,7 +76,8 @@ export const createCourse = asyncHandler(async (req: Request<{}, {}, CreateCours
             originalPrice: originalPrice || null,
             categoryId,
             thumbnail,
-            language: language.toLowerCase().trim()
+            language: language.map((l: string) => l.toLowerCase()),
+            whatYouWillLearn: whatYouWillLearn || []
         }
     })
 
@@ -89,7 +90,7 @@ export const createCourse = asyncHandler(async (req: Request<{}, {}, CreateCours
 
 export const updateCourse = asyncHandler(async (req: Request<{ id: string }, {}, CreateCourseDto>, res: Response) => {
     const { id } = req.params;
-    const { title, description, price, originalPrice, categoryId, thumbnail } = req.body;
+    const { title, description, price, originalPrice, categoryId, thumbnail, language, whatYouWillLearn } = req.body;
     // check with this title course is already exists.
     const isExistingCourse = await prisma.course.findUnique({ where: { title: title.toLowerCase().trim() } })
     if (isExistingCourse && isExistingCourse.id !== Number(id)) {
@@ -103,7 +104,9 @@ export const updateCourse = asyncHandler(async (req: Request<{ id: string }, {},
             price,
             originalPrice: originalPrice || null,
             categoryId,
-            thumbnail
+            thumbnail,
+            language: language.map((l: string) => l.toLowerCase()),
+            whatYouWillLearn: whatYouWillLearn || []
         }
     })
 
@@ -132,6 +135,7 @@ export const archiveCourse = asyncHandler(async (req: Request<{ id: string }>, r
 
     res.success("Course archived successfully", course)
 })
+
 
 export const getAllCoursesForAdmin = asyncHandler(async (req: Request, res: Response) => {
     const page = Number(req.query.page) || 1

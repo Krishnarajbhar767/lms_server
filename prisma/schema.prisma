@@ -33,24 +33,25 @@ model Category {
 }
 
 model Course {
-  id            Int              @id @default(autoincrement())
-  title         String           @unique
-  description   String
-  price         Float
-  originalPrice Float?
-  status        CourseStatus     @default(DRAFT)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  categoryId    Int?
-  thumbnail     String
-  language      String
-  certificates  Certificate[]
-  category      Category?        @relation(fields: [categoryId], references: [id])
-  progress      CourseProgress[]
-  enrollments   Enrollment[]
-  payments      Payment[]
-  reviews       Review[]
-  sections      Section[]
+  id               Int              @id @default(autoincrement())
+  title            String           @unique
+  description      String
+  price            Float
+  originalPrice    Float?
+  status           CourseStatus     @default(DRAFT)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  categoryId       Int?
+  thumbnail        String
+  language         String[]
+  whatYouWillLearn String[]
+  certificates     Certificate[]
+  category         Category?        @relation(fields: [categoryId], references: [id])
+  progress         CourseProgress[]
+  enrollments      Enrollment[]
+  payments         Payment[]
+  reviews          Review[]
+  sections         Section[]
 }
 
 model Section {
