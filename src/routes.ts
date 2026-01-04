@@ -6,6 +6,7 @@ import { sectionRouter } from './routes/section.routes';
 import lessonRouter from './routes/lesson.routes';
 import bunnyRouter from './routes/bunny.routes';
 import { quizeRouter } from './routes/quize.routes';
+import { cartRouter } from './routes/cart.routes';
 import { isAdmin, isAuthenticated } from './middleware/auth.middleware';
 
 
@@ -25,6 +26,8 @@ router.use('/lessons', lessonRouter);
 router.use('/bunny', isAuthenticated, isAdmin, bunnyRouter);
 // Quize Routes
 router.use('/quizes', quizeRouter);
+// Cart Routes
+router.use('/cart', cartRouter);
 
 
 export default router;
