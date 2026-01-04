@@ -23,6 +23,7 @@ model User {
   enrollments        Enrollment[]
   payments           Payment[]
   reviews            Review[]
+  cart               Cart?
 }
 
 model Category {
@@ -30,6 +31,26 @@ model Category {
   name        String   @unique
   description String
   courses     Course[]
+}
+
+model Cart {
+  id        Int        @id @default(autoincrement())
+  userId    Int        @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id       Int      @id @default(autoincrement())
+  cartId   Int
+  courseId Int
+  cart     Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  addedAt  DateTime @default(now())
+
+  @@unique([cartId, courseId]) // Prevent duplicate courses in the same cart
 }
 
 model Course {
@@ -52,6 +73,7 @@ model Course {
   payments         Payment[]
   reviews          Review[]
   sections         Section[]
+  cartItems        CartItem[]
 }
 
 model Section {
