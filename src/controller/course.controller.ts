@@ -267,12 +267,49 @@ export const getCourseById = asyncHandler(async (req: Request<{ id: string }>, r
     if (!id) {
         throw new ValidationError('Course id is required')
     }
-    // include category  ,lesson,section all detals of course means  excute all related tables course => sections => lessons // order lesson and section in "ascending order"
-    const course = await prisma.course.findUnique({ where: { id: Number(id) }, include: { category: true, sections: { include: { lessons: { include: { resource: true }, orderBy: { order: "asc" } } }, orderBy: { order: "asc" } } } })
+
+    // Get course details with all relations
+    const course = await prisma.course.findUnique({
+        where: { id: Number(id) },
+        include: {
+            category: true,
+            sections: {
+                include: {
+                    lessons: {
+                        include: { resource: true },
+                        orderBy: { order: "asc" }
+                    }
+                },
+                orderBy: { order: "asc" }
+            }
+        }
+    })
+
     if (!course) {
         throw new ValidationError('Course not found')
     }
-    res.success("Course fetched successfully", course)
+
+    // Check if user is enrolled (if authenticated)
+    let isEnrolled = false;
+    if (req.user?.id) {
+        const enrollment = await prisma.enrollment.findUnique({
+            where: {
+                userId_courseId: {
+                    userId: Number(req.user.id),
+                    courseId: Number(id)
+                }
+            }
+        });
+        isEnrolled = !!enrollment;
+    }
+
+    // Add isEnrolled to course object
+    const courseWithEnrollmentStatus = {
+        ...course,
+        isEnrolled
+    };
+
+    res.success("Course fetched successfully", courseWithEnrollmentStatus)
 })
 // make course public or draft
 export const updateCourseStatus = asyncHandler(async (req: Request<{ id: string }, {}, {
@@ -294,3 +331,33 @@ export const updateCourseStatus = asyncHandler(async (req: Request<{ id: string 
     clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX)
     res.success("Course published successfully", course)
 })
+
+export const getEnrolledCourses = asyncHandler(async (req: Request, res: Response) => {
+    const userId = Number(req.user.id);
+
+    const enrollments = await prisma.enrollment.findMany({
+        where: { userId },
+        include: {
+            course: {
+                select: {
+                    id: true,
+                    title: true,
+                    description: true,
+                    thumbnail: true,
+                    price: true,
+                    originalPrice: true,
+                    language: true,
+                    whatYouWillLearn: true
+                }
+            }
+        },
+        orderBy: { createdAt: 'desc' }
+    });
+
+    const courses = enrollments.map(enrollment => enrollment.course);
+
+    return res.status(200).json({
+        success: true,
+        data: courses
+    });
+});

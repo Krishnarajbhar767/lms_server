@@ -7,6 +7,7 @@ import lessonRouter from './routes/lesson.routes';
 import bunnyRouter from './routes/bunny.routes';
 import { quizeRouter } from './routes/quize.routes';
 import { cartRouter } from './routes/cart.routes';
+import { paymentRouter } from './routes/payment.routes';
 import { isAdmin, isAuthenticated } from './middleware/auth.middleware';
 
 
@@ -28,6 +29,8 @@ router.use('/bunny', isAuthenticated, isAdmin, bunnyRouter);
 router.use('/quizes', quizeRouter);
 // Cart Routes
 router.use('/cart', cartRouter);
+// Payment Routes
+router.use('/payment', paymentRouter);
 
 
 export default router;

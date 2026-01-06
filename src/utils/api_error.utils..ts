@@ -36,6 +36,12 @@ export class NotFoundError extends ApiError {
   }
 }
 
+export class NotImplementedError extends ApiError {
+  constructor(message = 'Feature Not Implemented') {
+    super(501, message, true); // Operational - expected for unimplemented features
+  }
+}
+
 export class InternalError extends ApiError {
   constructor(message = 'Internal Server Error') {
     super(500, message, false); // unexpected

@@ -42,3 +42,22 @@ export const isStudent = async (req: Request, res: Response, next: NextFunction)
     }
     next();
 }
+
+export const optionalAuth = async (req: Request, res: Response, next: NextFunction) => {
+    const token = req.header("Authorization")?.replace("Bearer ", "") || req.headers.authorization?.split(" ")[1];
+
+    // No token? That's fine, continue without user
+    if (!token) {
+        return next();
+    }
+
+    // Try to decode token
+    try {
+        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as { id: string, email: string, role: ROLE };
+        req.user = decoded;
+    } catch (error) {
+        logger.warn('Invalid token in optional auth, continuing without user');
+    }
+
+    next();
+}
