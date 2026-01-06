@@ -33,7 +33,7 @@ export const initiateBuyNow = asyncHandler(async (req: Request, res: Response) =
 
     const result = await PaymentService.initiateBuyNowOrder(userId, courseId, userDetails);
 
-    res.status(200).json({
+    return res.status(200).json({
         success: true,
         message: "Payment Initiated",
         data: result.data
@@ -68,7 +68,7 @@ export const verifyPayment = asyncHandler(async (req: Request, res: Response) =>
         }
     }
 
-    res.status(200).json({
+    return res.status(200).json({
         success: true,
         message: result.message,
         verified: true
@@ -108,7 +108,7 @@ export const cancelOrder = asyncHandler(async (req: Request, res: Response) => {
         data: { status: "FAILED" }
     });
 
-    res.status(200).json({
+    return res.status(200).json({
         success: true,
         message: "Order cancelled"
     });
@@ -121,7 +121,7 @@ export const cancelOrder = asyncHandler(async (req: Request, res: Response) => {
 export const getPaymentSettings = asyncHandler(async (req: Request, res: Response) => {
     const result = await PaymentService.getActiveGateway();
 
-    res.status(200).json({
+    return res.status(200).json({
         success: true,
         data: result
     });
@@ -135,7 +135,7 @@ export const updatePaymentSettings = asyncHandler(async (req: Request, res: Resp
     const { provider } = req.body;
     await PaymentService.updatePaymentGatewaySettings(provider);
 
-    res.status(200).json({
+    return res.status(200).json({
         success: true,
         message: `Active payment gateway updated to ${provider}`
     });
