@@ -335,6 +335,7 @@ export const updateCourseStatus = asyncHandler(async (req: Request<{ id: string 
 export const getEnrolledCourses = asyncHandler(async (req: Request, res: Response) => {
     const userId = Number(req.user.id);
 
+    // Step 1: Fetch all enrollments with course data
     const enrollments = await prisma.enrollment.findMany({
         where: { userId },
         include: {
@@ -354,7 +355,21 @@ export const getEnrolledCourses = asyncHandler(async (req: Request, res: Respons
         orderBy: { createdAt: 'desc' }
     });
 
-    const courses = enrollments.map(enrollment => enrollment.course);
+    // Step 2: Fetch progress for all enrolled courses in ONE query
+    const courseIds = enrollments.map(e => e.course.id);
+    const progressRecords = await prisma.courseProgress.findMany({
+        where: { userId, courseId: { in: courseIds } },
+        select: { courseId: true, percentage: true }
+    });
+
+    // Step 3: Create a map for O(1) lookup
+    const progressMap = new Map(progressRecords.map(p => [p.courseId, p.percentage]));
+
+    // Step 4: Combine courses with their progress (default to 0 if no record)
+    const courses = enrollments.map(enrollment => ({
+        ...enrollment.course,
+        progress: progressMap.get(enrollment.course.id) ?? 0
+    }));
 
     return res.status(200).json({
         success: true,
