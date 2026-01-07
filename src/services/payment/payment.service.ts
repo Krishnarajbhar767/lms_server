@@ -336,3 +336,270 @@ export const getActiveGateway = async () => {
     const provider = await getActiveProviderName();
     return { provider };
 };
+
+/**
+ * Cart Checkout - Buy multiple courses at once
+ * 
+ * Flow:
+ * 1. Get cart items
+ * 2. Validate all courses (published, not enrolled)
+ * 3. Create separate Order for each course
+ * 4. Create ONE gateway order with total amount
+ * 5. Return payment data for frontend
+ */
+export const initiateCartCheckout = async (
+    userId: number,
+    userDetails: { name: string; email: string }
+) => {
+    logger.info(`[PaymentService] Starting Cart Checkout - User:${userId}`);
+
+    // STEP 1: Get cart items
+    const cart = await prisma.cart.findUnique({
+        where: { userId },
+        include: {
+            items: {
+                include: {
+                    course: {
+                        select: { id: true, title: true, price: true, status: true }
+                    }
+                }
+            }
+        }
+    });
+
+    if (!cart || cart.items.length === 0) {
+        throw new ValidationError("Your cart is empty.");
+    }
+
+    const courses = cart.items.map(item => item.course);
+
+    // STEP 2: Validate all courses
+    const courseIds = courses.map(c => c.id);
+
+    // Check for unpublished courses
+    const unpublished = courses.filter(c => c.status !== "PUBLISHED");
+    if (unpublished.length > 0) {
+        throw new ValidationError(`Some courses are no longer available: ${unpublished.map(c => c.title).join(", ")}`);
+    }
+
+    // Check for free courses (payment gateway can't process 0)
+    const freeCourses = courses.filter(c => c.price === 0);
+    if (freeCourses.length > 0) {
+        throw new ValidationError(`Please remove free courses and enroll directly: ${freeCourses.map(c => c.title).join(", ")}`);
+    }
+
+    // Check for existing enrollments
+    const existingEnrollments = await prisma.enrollment.findMany({
+        where: { userId, courseId: { in: courseIds } },
+        select: { courseId: true }
+    });
+
+    if (existingEnrollments.length > 0) {
+        const enrolledIds = existingEnrollments.map(e => e.courseId);
+        const enrolledTitles = courses.filter(c => enrolledIds.includes(c.id)).map(c => c.title);
+        throw new ValidationError(`Already enrolled in: ${enrolledTitles.join(", ")}. Please remove from cart.`);
+    }
+
+    // STEP 3: Check for recent pending orders (any course in cart)
+    const TIMEOUT_MINUTES = 1;
+    const timeoutMs = TIMEOUT_MINUTES * 60 * 1000;
+    const cutoffTime = new Date(Date.now() - timeoutMs);
+
+    const pendingOrders = await prisma.order.findFirst({
+        where: {
+            userId,
+            courseId: { in: courseIds },
+            status: "PENDING",
+            createdAt: { gt: cutoffTime }
+        }
+    });
+
+    if (pendingOrders) {
+        const secondsAgo = Math.floor((Date.now() - pendingOrders.createdAt.getTime()) / 1000);
+        throw new ValidationError(`Payment started ${secondsAgo}s ago. Wait 1 min to retry.`);
+    }
+
+    // STEP 4: Calculate total
+    const totalAmount = courses.reduce((sum, c) => sum + c.price, 0);
+    const courseTitles = courses.map(c => c.title).join(", ");
+
+    // STEP 5: Get active payment gateway
+    const paymentGateway = await getPaymentProvider();
+    const providerName = paymentGateway.getProviderName();
+
+    logger.info(`[PaymentService] Cart checkout using: ${providerName}, Total: ₹${totalAmount}`);
+
+    // STEP 6: Create orders for each course (PENDING)
+    const orders = await prisma.$transaction(
+        courses.map(course =>
+            prisma.order.create({
+                data: {
+                    userId,
+                    courseId: course.id,
+                    amount: course.price,
+                    currency: "INR",
+                    status: "PENDING",
+                    provider: providerName
+                }
+            })
+        )
+    );
+
+    // STEP 7: Create ONE gateway order with total amount
+    // Use first order ID as reference
+    try {
+        const gatewayResult = await paymentGateway.createOrder({
+            amount: totalAmount,
+            currency: "INR",
+            orderId: orders[0].id,
+            courseId: courses[0].id,
+            courseTitle: `Cart: ${courses.length} courses`,
+            userEmail: userDetails.email,
+            userName: userDetails.name
+        });
+
+        // Update FIRST order with gateway order ID (unique constraint)
+        await prisma.order.update({
+            where: { id: orders[0].id },
+            data: { gatewayOrderId: gatewayResult.gatewayOrderId }
+        });
+
+        return {
+            success: true,
+            data: {
+                gatewayOrderId: gatewayResult.gatewayOrderId,
+                amount: gatewayResult.amount,
+                currency: gatewayResult.currency,
+                key: gatewayResult.gatewayKeyId,
+                provider: providerName,
+                internalOrderIds: orders.map(o => o.id), // All order IDs for verification
+                courseCount: courses.length,
+                courseTitles: courseTitles,
+                userEmail: userDetails.email,
+                userName: userDetails.name
+            }
+        };
+    } catch (error: any) {
+        // If gateway fails, mark all orders as FAILED
+        await prisma.order.updateMany({
+            where: { id: { in: orders.map(o => o.id) } },
+            data: { status: "FAILED" }
+        });
+        throw error;
+    }
+};
+
+/**
+ * Verify Cart Payment - Complete all orders from checkout
+ */
+export const verifyCartPayment = async (
+    userId: number,
+    paymentData: Record<string, any>
+) => {
+    logger.info(`[PaymentService] Verifying cart payment - User:${userId}`);
+
+    // Extract gateway order ID and order IDs from frontend
+    const gatewayOrderId =
+        paymentData.razorpay_order_id ||
+        paymentData.transactionId ||
+        paymentData.orderId ||
+        paymentData.order_id;
+
+    const orderIds: number[] = paymentData.orderIds || [];
+
+    if (!gatewayOrderId) {
+        throw new ValidationError("Order ID not found in payment data");
+    }
+
+    // Find orders - first by gatewayOrderId, then by orderIds
+    let orders = await prisma.order.findMany({
+        where: { gatewayOrderId },
+        include: { course: true }
+    });
+
+    // If only one order found (the first one with gatewayOrderId), find the rest by IDs
+    if (orders.length === 1 && orderIds.length > 1) {
+        orders = await prisma.order.findMany({
+            where: {
+                id: { in: orderIds },
+                userId: userId,
+                status: "PENDING"
+            },
+            include: { course: true }
+        });
+    }
+
+    if (orders.length === 0) {
+        throw new NotFoundError("Orders not found.");
+    }
+
+    // Check if already processed
+    if (orders.every(o => o.status === "COMPLETED")) {
+        return { success: true, message: "Payment already processed." };
+    }
+
+    // Get payment gateway for verification
+    const paymentGateway = await getPaymentProviderByName(orders[0].provider);
+
+    // Verify signature
+    const verifyResult = await paymentGateway.verifyPayment({
+        gatewayOrderId: paymentData.razorpay_order_id || paymentData.orderId || gatewayOrderId,
+        gatewayPaymentId: paymentData.razorpay_payment_id || paymentData.transactionId,
+        gatewaySignature: paymentData.razorpay_signature || paymentData.signature
+    });
+
+    if (!verifyResult.isValid) {
+        await prisma.order.updateMany({
+            where: { id: { in: orders.map(o => o.id) } },
+            data: { status: "FAILED" }
+        });
+        throw new ValidationError("Invalid payment signature.");
+    }
+
+    // Complete all orders + enrollments in transaction
+    try {
+        await prisma.$transaction(async (tx) => {
+            for (const order of orders) {
+                // Update order status
+                await tx.order.update({
+                    where: { id: order.id },
+                    data: { status: "COMPLETED" }
+                });
+
+                // Create enrollment
+                const enrollment = await tx.enrollment.create({
+                    data: { userId: order.userId, courseId: order.courseId }
+                });
+
+                // Create payment record
+                await tx.payment.create({
+                    data: {
+                        userId: order.userId,
+                        courseId: order.courseId,
+                        amount: order.amount,
+                        provider: order.provider,
+                        status: "SUCCESS",
+                        gatewayPaymentId: verifyResult.paymentId,
+                        gatewaySignature: verifyResult.signature,
+                        orderId: order.id,
+                        enrollmentId: enrollment.id
+                    }
+                });
+            }
+
+            // Clear cart after successful checkout
+            const userCart = await tx.cart.findUnique({ where: { userId } });
+            if (userCart) {
+                await tx.cartItem.deleteMany({ where: { cartId: userCart.id } });
+            }
+        });
+
+        logger.info(`[PaymentService] Cart checkout complete - ${orders.length} courses enrolled`);
+        return { success: true, message: `Enrolled in ${orders.length} courses!` };
+    } catch (error: any) {
+        if (error.code === "P2002") {
+            return { success: true, message: "Already enrolled." };
+        }
+        throw new InternalError("Payment processing failed.");
+    }
+};

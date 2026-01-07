@@ -3,7 +3,7 @@ import { isAuthenticated, isAdmin } from "../middleware/auth.middleware";
 import { validate } from "../middleware/zod_validate.middleware";
 
 // Import Controllers and Schemas
-import { initiateBuyNow, cancelOrder, verifyPayment, getPaymentSettings, updatePaymentSettings } from "../controller/payment.controller";
+import { initiateBuyNow, cancelOrder, verifyPayment, getPaymentSettings, updatePaymentSettings, initiateCheckout, verifyCheckout } from "../controller/payment.controller";
 import { initiatePaymentSchema, verifyPaymentSchema, updatePaymentSettingsSchema } from "../validation/payment.validation";
 
 export const paymentRouter = Router();
@@ -20,6 +20,17 @@ paymentRouter.post(
 );
 
 /**
+ * Route: POST /api/payment/checkout
+ * Desc: Checkout entire cart. Creates orders for all cart items.
+ * Auth: Authenticated
+ */
+paymentRouter.post(
+    "/checkout",
+    isAuthenticated,
+    initiateCheckout
+);
+
+/**
  * Route: POST /api/payment/verify
  * Desc: Verifies the payment signature returned by Razorpay.
  * Auth: Student/Admin (Authenticated)
@@ -29,6 +40,18 @@ paymentRouter.post(
     isAuthenticated,
     validate(verifyPaymentSchema),
     verifyPayment
+);
+
+/**
+ * Route: POST /api/payment/verify-checkout
+ * Desc: Verifies cart checkout payment and enrolls in all courses.
+ * Auth: Authenticated
+ */
+paymentRouter.post(
+    "/verify-checkout",
+    isAuthenticated,
+    validate(verifyPaymentSchema),
+    verifyCheckout
 );
 
 /**

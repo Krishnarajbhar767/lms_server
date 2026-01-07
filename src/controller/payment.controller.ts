@@ -3,11 +3,6 @@ import asyncHandler from "../utils/async_handler.utils";
 import { prisma } from "../prisma";
 import * as PaymentService from "../services/payment/payment.service";
 
-
-// ============================================================================
-// CONTROLLERS
-// ============================================================================
-
 /**
  * 1. Initiate Buy Now
  * Route: POST /api/payment/buy-now
@@ -141,3 +136,48 @@ export const updatePaymentSettings = asyncHandler(async (req: Request, res: Resp
     });
 });
 
+/**
+ * 5. Initiate Cart Checkout
+ * Route: POST /api/payment/checkout
+ */
+export const initiateCheckout = asyncHandler(async (req: Request, res: Response) => {
+    const userId = Number(req.user.id);
+
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, lastName: true, email: true }
+    });
+
+    if (!user) {
+        throw new Error("User not found");
+    }
+
+    const userDetails = {
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email
+    };
+
+    const result = await PaymentService.initiateCartCheckout(userId, userDetails);
+
+    return res.status(200).json({
+        success: true,
+        message: "Checkout Initiated",
+        data: result.data
+    });
+});
+
+/**
+ * 6. Verify Cart Payment
+ * Route: POST /api/payment/verify-checkout
+ */
+export const verifyCheckout = asyncHandler(async (req: Request, res: Response) => {
+    const userId = Number(req.user.id);
+
+    const result = await PaymentService.verifyCartPayment(userId, req.body);
+
+    return res.status(200).json({
+        success: true,
+        message: result.message,
+        verified: true
+    });
+});
