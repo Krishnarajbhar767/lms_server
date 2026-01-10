@@ -59,13 +59,13 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads"), {
   }
 }));
 
-// Serving the new resource folder
-app.use("/resource", express.static(path.join(__dirname, "../resource"), {
-  setHeaders: (res, filePath) => {
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    // Add content type headers if needed, similar to uploads
-  }
-}));
+// Removed unsecured resource serving - now using protected endpoint
+// Resources are now served through /api/resource/view/:resourceId with enrollment verification
+// app.use("/resource", express.static(path.join(__dirname, "../resource"), {
+//   setHeaders: (res, filePath) => {
+//     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+//   }
+// }));
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 // cors config

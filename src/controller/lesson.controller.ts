@@ -88,11 +88,26 @@ export const uploadResource = asyncHandler(async (req: any, res: Response) => {
         throw new ValidationError("Resource file is required");
     }
 
-    // Validate file type if needed (e.g. PDF, Doc)
-    // const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    // if (!allowedTypes.includes(resourceFile.mimetype)) {
-    //     throw new ValidationError("Invalid file type. Only PDF and Docs are allowed.");
-    // }
+    // Validate file type - Allow PDF, Word, Excel, PowerPoint, Images
+    const allowedTypes = [
+        'application/pdf',
+        'application/msword', // .doc
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+        'application/vnd.ms-excel', // .xls
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'application/vnd.ms-powerpoint', // .ppt
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx  
+        'image/png',
+        'image/jpeg',
+        'image/jpg',
+        'image/gif',
+        'image/webp',
+        'image/svg+xml'
+    ];
+    
+    if (!allowedTypes.includes(resourceFile.mimetype)) {
+        throw new ValidationError("Invalid file type. Only PDF, Word, Excel, PowerPoint, and Images are allowed.");
+    }
 
     // make resource name unique so that when lesson delete its east to delete it
     const uploadDir = path.join(process.cwd(), "resource");

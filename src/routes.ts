@@ -8,6 +8,7 @@ import bunnyRouter from './routes/bunny.routes';
 import { quizeRouter } from './routes/quize.routes';
 import { cartRouter } from './routes/cart.routes';
 import { paymentRouter } from './routes/payment.routes';
+import resourceRouter from './routes/resource.routes';
 import { isAdmin, isAuthenticated } from './middleware/auth.middleware';
 
 
@@ -31,6 +32,8 @@ router.use('/quizes', quizeRouter);
 router.use('/cart', cartRouter);
 // Payment Routes
 router.use('/payment', paymentRouter);
+// Protected Resource Routes
+router.use('/resource', resourceRouter);
 
 
 export default router;

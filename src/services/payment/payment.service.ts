@@ -451,8 +451,8 @@ export const initiateCartCheckout = async (
         const gatewayResult = await paymentGateway.createOrder({
             amount: totalAmount,
             currency: "INR",
-            orderId: orders[0].id,
-            courseId: courses[0].id,
+            orderId: orders[0]!.id,  // Non-null: orders always has items (validated above)
+            courseId: courses[0]!.id, // Non-null: courses always has items (validated above)
             courseTitle: `Cart: ${courses.length} courses`,
             userEmail: userDetails.email,
             userName: userDetails.name
@@ -460,7 +460,7 @@ export const initiateCartCheckout = async (
 
         // Update FIRST order with gateway order ID (unique constraint)
         await prisma.order.update({
-            where: { id: orders[0].id },
+            where: { id: orders[0]!.id }, // Non-null: orders always has items
             data: { gatewayOrderId: gatewayResult.gatewayOrderId }
         });
 
@@ -539,7 +539,7 @@ export const verifyCartPayment = async (
     }
 
     // Get payment gateway for verification
-    const paymentGateway = await getPaymentProviderByName(orders[0].provider);
+    const paymentGateway = await getPaymentProviderByName(orders[0]!.provider); // Non-null: orders length checked above
 
     // Verify signature
     const verifyResult = await paymentGateway.verifyPayment({
