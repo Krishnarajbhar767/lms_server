@@ -2,13 +2,15 @@
 import axios from "axios";
 import { Request, Response } from "express";
 import asyncHandler from "../utils/async_handler.utils";
-import { ValidationError } from "../utils/api_error.utils.";
+import { ValidationError, AuthError, NotFoundError } from "../utils/api_error.utils.";
+import { prisma } from "../prisma";
 
 import crypto from "crypto";
 import { deleteBunnyVideo } from "../utils/delete-bunny-video";
 const BUNNY_LIBRARY_ID = process.env.BUNNY_STREAM_LIBRARY_ID;
 const BUNNY_API_KEY = process.env.BUNNY_STREAM_API_KEY;
 const BUNNY_TOKEN_SECRET = process.env.BUNNY_TOKEN_SECRET;
+
 export const createBunnyVideo = asyncHandler(async (req: Request, res: Response) => {
     const title = req.body?.title;
 
@@ -52,6 +54,44 @@ export const getEmbedUrl = asyncHandler(async (req: Request, res: Response) => {
     const libraryId = BUNNY_LIBRARY_ID
     const videoGuid = req?.params?.videoGuid
     const tokenSecret = BUNNY_TOKEN_SECRET as string
+
+    if (!videoGuid) {
+        throw new ValidationError("Video GUID is required");
+    }
+
+    const user = (req as any).user;
+    if (!user) throw new AuthError("User not identified");
+
+    // Admins can view anything
+    if (user.role !== "ADMIN") {
+        // 1. Find the lesson containing this video
+        const lesson = await prisma.lesson.findFirst({
+            where: { bunnyVideoId: videoGuid },
+            include: { section: true }
+        });
+
+        // If video is not linked to any lesson, accessing it is suspicious (or maybe it's a new upload?)
+        // For security, strict blocking:
+        if (!lesson) {
+            throw new NotFoundError("Video resource not found or not linked to any course.");
+        }
+
+        const courseId = lesson.section.courseId;
+
+        // 2. Check if user is enrolled
+        const enrollment = await prisma.enrollment.findUnique({
+            where: {
+                userId_courseId: {
+                    userId: user.id,
+                    courseId: courseId
+                }
+            }
+        });
+
+        if (!enrollment) {
+            throw new AuthError("You are not enrolled in the course this video belongs to.");
+        }
+    }
 
     // expires in 60 seconds
     const expires = Math.floor(Date.now() / 1000) + 60;
