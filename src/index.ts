@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 
@@ -32,6 +33,17 @@ app.use(fileUpload({
 app.use(compression());
 // using helmet to make header more secure
 app.use(helmet());
+
+// Rate limiting to prevent DDoS
+const limiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 200, // 200 requests per windowMs per IP
+  message: { success: false, message: 'Too many requests, please try again later.' },
+  standardHeaders: true, // Return rate limit info in headers
+  legacyHeaders: false,
+});
+app.use(limiter);
+
 // using morgan for logging requests
 if (process.env.NODE_ENV === 'production') {
   app.use(
