@@ -3,10 +3,21 @@ import { isAuthenticated, isAdmin } from "../middleware/auth.middleware";
 import { validate } from "../middleware/zod_validate.middleware";
 
 // Import Controllers and Schemas
-import { initiateBuyNow, cancelOrder, verifyPayment, getPaymentSettings, updatePaymentSettings, initiateCheckout, verifyCheckout } from "../controller/payment.controller";
+import { initiateBuyNow, cancelOrder, verifyPayment, getPaymentSettings, updatePaymentSettings, initiateCheckout, verifyCheckout, getPurchaseHistory } from "../controller/payment.controller";
 import { initiatePaymentSchema, verifyPaymentSchema, updatePaymentSettingsSchema } from "../validation/payment.validation";
 
 export const paymentRouter = Router();
+
+/**
+ * Route: GET /api/payment/history
+ * Desc: Gets user's purchase history (completed orders)
+ * Auth: Authenticated
+ */
+paymentRouter.get(
+    "/history",
+    isAuthenticated,
+    getPurchaseHistory
+);
 /**
  * Route: POST /api/payment/buy-now
  * Desc: Initiates a transaction. Returns order details for Razorpay SDK.

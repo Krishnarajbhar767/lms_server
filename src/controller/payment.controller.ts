@@ -181,3 +181,43 @@ export const verifyCheckout = asyncHandler(async (req: Request, res: Response) =
         verified: true
     });
 });
+
+/**
+ * 7. Get Purchase History
+ * Route: GET /api/payment/history
+ * Returns all completed orders for the authenticated user
+ */
+export const getPurchaseHistory = asyncHandler(async (req: Request, res: Response) => {
+    const userId = Number(req.user.id);
+
+    const orders = await prisma.order.findMany({
+        where: {
+            userId,
+        },
+        include: {
+            course: {
+                select: {
+                    id: true,
+                    title: true,
+                    thumbnail: true,
+                }
+            },
+            payment: {
+                select: {
+                    gatewayPaymentId: true,
+                    provider: true,
+                }
+            }
+        },
+        orderBy: {
+            createdAt: "desc"
+        }
+    });
+
+    return res.status(200).json({
+        success: true,
+        message: "Purchase history fetched",
+        data: orders
+    });
+});
+
