@@ -392,3 +392,140 @@ export const updateLesson = asyncHandler(async (req: Request<{ id: string }>, re
 
     return res.success("Lesson updated successfully", course, 200);
 });
+
+// Mark lesson as complete
+export const markLessonComplete = asyncHandler(async (req: Request<{ id: string }>, res: Response) => {
+    const userId = Number(req.user.id);
+    const lessonId = Number(req.params.id);
+    const { watchedPercentage } = req.body;
+
+    if (Number.isNaN(lessonId)) {
+        throw new ValidationError("Invalid lesson id");
+    }
+
+    // Must watch at least 50%
+    if (!watchedPercentage || watchedPercentage < 50) {
+        throw new ValidationError("Please watch at least 50% of the video");
+    }
+
+    // Get lesson and verify enrollment
+    const lesson = await prisma.lesson.findUnique({
+        where: { id: lessonId },
+        include: { section: true }
+    });
+    if (!lesson) throw new ValidationError("Lesson not found");
+
+    const courseId = lesson.section.courseId;
+    const enrollment = await prisma.enrollment.findUnique({
+        where: { userId_courseId: { userId, courseId } }
+    });
+    if (!enrollment) throw new ValidationError("Not enrolled in this course");
+
+    // Mark lesson as complete
+    await prisma.lessonProgress.upsert({
+        where: { lessonId_userId: { lessonId, userId } },
+        create: { lessonId, userId, isComplete: true, completedAt: new Date() },
+        update: { isComplete: true, completedAt: new Date() }
+    });
+
+    // Update course progress percentage
+    const totalLessons = await prisma.lesson.count({ where: { section: { courseId } } });
+    const completedLessons = await prisma.lessonProgress.count({
+        where: { userId, isComplete: true, lesson: { section: { courseId } } }
+    });
+    const percentage = Math.round((completedLessons / totalLessons) * 100);
+
+    await prisma.courseProgress.upsert({
+        where: { userId_courseId: { userId, courseId } },
+        create: { userId, courseId, percentage },
+        update: { percentage }
+    });
+
+    res.success("Lesson completed", { percentage, lessonId });
+});
+
+// Save watch progress
+export const saveWatchProgress = asyncHandler(async (req: Request<{ id: string }>, res: Response) => {
+    const userId = Number(req.user.id);
+    const lessonId = Number(req.params.id);
+    const { watchedSeconds } = req.body;
+
+    if (Number.isNaN(lessonId)) {
+        throw new ValidationError("Invalid lesson id");
+    }
+
+    if (typeof watchedSeconds !== 'number' || watchedSeconds < 0) {
+        throw new ValidationError("Invalid watchedSeconds");
+    }
+
+    // Upsert the progress - only save if new value is greater
+    await prisma.lessonProgress.upsert({
+        where: { lessonId_userId: { lessonId, userId } },
+        create: { lessonId, userId, watchedSeconds, isComplete: false },
+        update: {
+            watchedSeconds: {
+                // Only update if new value is greater (prevents going backwards)
+                set: watchedSeconds
+            }
+        }
+    });
+
+    res.success("Progress saved", { watchedSeconds });
+});
+
+// Get lesson progress for user 
+export const getLessonProgressForCourse = asyncHandler(async (req: Request<{ courseId: string }>, res: Response) => {
+    const userId = Number(req.user.id);
+    const courseId = Number(req.params.courseId);
+
+    if (Number.isNaN(courseId)) {
+        throw new ValidationError("Invalid course id");
+    }
+
+    // Get all lesson progress for this user in this course
+    const progress = await prisma.lessonProgress.findMany({
+        where: {
+            userId,
+            lesson: {
+                section: { courseId }
+            }
+        },
+        select: {
+            lessonId: true,
+            watchedSeconds: true,
+            isComplete: true
+        }
+    });
+
+    // Get all quiz attempts for this user in this course
+    const quizAttempts = await prisma.quizAttempt.findMany({
+        where: {
+            userId,
+            quiz: {
+                section: { courseId }
+            }
+        },
+        select: {
+            quizId: true,
+            score: true,
+            passed: true
+        }
+    });
+
+    // Convert lesson progress to map
+    const lessonProgressMap = progress.reduce((acc, p) => {
+        acc[p.lessonId] = { watchedSeconds: p.watchedSeconds, isComplete: p.isComplete };
+        return acc;
+    }, {} as Record<number, { watchedSeconds: number, isComplete: boolean }>);
+
+    // Convert quiz attempts to map
+    const quizAttemptsMap = quizAttempts.reduce((acc, a) => {
+        acc[a.quizId] = { score: a.score, passed: a.passed };
+        return acc;
+    }, {} as Record<number, { score: number, passed: boolean }>);
+
+    res.success("Progress fetched", {
+        lessons: lessonProgressMap,
+        quizzes: quizAttemptsMap
+    });
+});

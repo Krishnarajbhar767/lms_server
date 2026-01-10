@@ -278,6 +278,13 @@ export const getCourseById = asyncHandler(async (req: Request<{ id: string }>, r
                     lessons: {
                         include: { resource: true },
                         orderBy: { order: "asc" }
+                    },
+                    quize: {
+                        include: {
+                            questions: {
+                                include: { options: true }
+                            }
+                        }
                     }
                 },
                 orderBy: { order: "asc" }

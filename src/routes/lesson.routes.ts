@@ -1,8 +1,8 @@
 import e from "express";
-import { isAdmin, isAuthenticated } from "../middleware/auth.middleware";
+import { isAdmin, isAuthenticated, isStudent } from "../middleware/auth.middleware";
 import { validate } from "../middleware/zod_validate.middleware";
 import { createLessonSchema } from "../validation/lesson.validation";
-import { createLesson, deleteResource, uploadResource, reorderLessons, deleteLesson, updateLesson, deleteResourceFile } from "../controller/lesson.controller";
+import { createLesson, deleteResource, uploadResource, reorderLessons, deleteLesson, updateLesson, deleteResourceFile, markLessonComplete, saveWatchProgress, getLessonProgressForCourse } from "../controller/lesson.controller";
 import { deleteLessonVideo } from "../controller/bunny.controller";
 
 const lessonRouter = e.Router()
@@ -14,4 +14,10 @@ lessonRouter.delete('/resource/:id', isAuthenticated, isAdmin, deleteResource)
 lessonRouter.delete("/:id", isAuthenticated, isAdmin, deleteLesson)
 lessonRouter.put("/update/:id", isAuthenticated, isAdmin, updateLesson)
 lessonRouter.put("/reorder/:sectionId", isAuthenticated, isAdmin, reorderLessons)
+
+// Student routes
+lessonRouter.post("/:id/complete", isAuthenticated, isStudent, markLessonComplete)
+lessonRouter.post("/:id/progress", isAuthenticated, isStudent, saveWatchProgress)
+lessonRouter.get("/progress/course/:courseId", isAuthenticated, isStudent, getLessonProgressForCourse)
+
 export default lessonRouter

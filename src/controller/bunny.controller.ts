@@ -61,9 +61,6 @@ export const getEmbedUrl = asyncHandler(async (req: Request, res: Response) => {
         .update(tokenSecret + videoGuid + expires)
         .digest("hex");
 
-    // const embedUrl =
-    //     `https://iframe.mediadelivery.net/embed/${libraryId}/${videoGuid}` +
-    //     `?token=${token}&expires=${expires}`;
     const embedUrl = `https://player.mediadelivery.net/embed/${libraryId}/${videoGuid}` +
         `?token=${token}&expires=${expires}`;
 

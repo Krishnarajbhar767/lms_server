@@ -23,8 +23,8 @@ router.use('/courses', courseRouter);
 router.use('/sections', sectionRouter);
 // Lesson Routes
 router.use('/lessons', lessonRouter);
-// Bunny Routes
-router.use('/bunny', isAuthenticated, isAdmin, bunnyRouter);
+// Bunny Routes (individual routes handle their own auth)
+router.use('/bunny', bunnyRouter);
 // Quize Routes
 router.use('/quizes', quizeRouter);
 // Cart Routes

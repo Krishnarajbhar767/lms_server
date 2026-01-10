@@ -17,14 +17,16 @@ model User {
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   isActive           Boolean          @default(false)
-  passwordResetToken String? // verification token for forgot password
+  passwordResetToken String?
   certificates       Certificate[]
   progress           CourseProgress[]
+  lessonProgress     LessonProgress[]
   enrollments        Enrollment[]
   payments           Payment[]
   reviews            Review[]
   cart               Cart?
   orders             Order[]
+  quizAttempts       QuizAttempt[]
 }
 
 model Category {
@@ -90,11 +92,25 @@ model Section {
 
 // Here Is All Schema For Smooth Quizzes That Belong to  Section one section contain only one Quize  and Quize  Contain  Many Questions And Thair  Option
 model Quize {
-  id        Int        @id @default(autoincrement())
+  id        Int           @id @default(autoincrement())
   title     String
-  sectionId Int        @unique
-  section   Section    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  sectionId Int           @unique
+  section   Section       @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   questions Question[]
+  attempts  QuizAttempt[]
+}
+
+model QuizAttempt {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  quizId    Int
+  score     Int // Percentage 0-100
+  passed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz      Quize    @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, quizId])
 }
 
 model Question {
@@ -114,14 +130,15 @@ model Option {
 }
 
 model Lesson {
-  id           Int        @id @default(autoincrement())
+  id           Int              @id @default(autoincrement())
   title        String
   bunnyVideoId String
   duration     Int // stored as minutes 
   sectionId    Int
   resource     Resource[]
-  section      Section    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  order        Int        @default(1)
+  progress     LessonProgress[]
+  section      Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  order        Int              @default(1)
 }
 
 model Resource {
@@ -171,6 +188,19 @@ model CourseProgress {
   user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
+}
+
+model LessonProgress {
+  id             Int       @id @default(autoincrement())
+  lessonId       Int
+  userId         Int
+  isComplete     Boolean   @default(false)
+  watchedSeconds Int       @default(0)
+  completedAt    DateTime?
+  lesson         Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, userId])
 }
 
 model Certificate {

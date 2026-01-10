@@ -143,3 +143,76 @@ export const deleteQuize = asyncHandler(
         return res.success("Quiz deleted successfully", null, 200);
     }
 );
+
+// Submit quiz answers
+export const submitQuiz = asyncHandler(
+    async (req: Request<{ id: string }>, res: Response) => {
+        const userId = Number(req.user.id);
+        const quizId = Number(req.params.id);
+        const { answers } = req.body; // answers: { questionId: optionId }
+
+        if (isNaN(quizId)) {
+            throw new ValidationError("Invalid quiz ID");
+        }
+
+        // Get quiz with questions and options
+        const quiz = await prisma.quize.findUnique({
+            where: { id: quizId },
+            include: {
+                questions: {
+                    include: { options: true }
+                }
+            }
+        });
+
+        if (!quiz) {
+            throw new ValidationError("Quiz not found");
+        }
+
+        // Calculate score
+        let correct = 0;
+        const total = quiz.questions.length;
+
+        for (const question of quiz.questions) {
+            const selectedOptionId = answers[question.id];
+            const correctOption = question.options.find(o => o.isCorrect);
+            if (correctOption && correctOption.id === selectedOptionId) {
+                correct++;
+            }
+        }
+
+        const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+        const passed = score >= 70; // 70% to pass
+
+        // Upsert attempt (user can retry)
+        const attempt = await prisma.quizAttempt.upsert({
+            where: { userId_quizId: { userId, quizId } },
+            create: { userId, quizId, score, passed },
+            update: { score, passed }
+        });
+
+        return res.success(
+            passed ? "Quiz passed!" : "Quiz not passed. Try again!",
+            { score, passed, correct, total, attemptId: attempt.id },
+            200
+        );
+    }
+);
+
+// Get quiz attempt
+export const getQuizAttempt = asyncHandler(
+    async (req: Request<{ id: string }>, res: Response) => {
+        const userId = Number(req.user.id);
+        const quizId = Number(req.params.id);
+
+        if (isNaN(quizId)) {
+            throw new ValidationError("Invalid quiz ID");
+        }
+
+        const attempt = await prisma.quizAttempt.findUnique({
+            where: { userId_quizId: { userId, quizId } }
+        });
+
+        return res.success("Attempt fetched", attempt, 200);
+    }
+);
