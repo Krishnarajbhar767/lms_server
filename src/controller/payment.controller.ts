@@ -2,6 +2,10 @@ import { Request, Response } from "express";
 import asyncHandler from "../utils/async_handler.utils";
 import { prisma } from "../prisma";
 import * as PaymentService from "../services/payment/payment.service";
+import { sendMail } from "../utils/send_mail.utils";
+import { paymentSuccessTemplate } from "../template/payment-success.template";
+import { cartPaymentSuccessTemplate } from "../template/cart-payment-success.template";
+import { logger } from "../config/logger.config";
 
 /**
  * 1. Initiate Buy Now
@@ -51,16 +55,44 @@ export const verifyPayment = asyncHandler(async (req: Request, res: Response) =>
 
     // Send Email in background (Fire and Forget)
     if (result.success) {
-        try {
-            // Fetch clean data for email if needed, or rely on frontend to show success
-            // sending a generic success email or fetching order details again if strictly needed
-            // For simplicity, we just log intent here. 
-            // In a real app we might fetch the order.course.title again or pass it through.
-            // console.log("Sending success email...");
-            // sendMail(...) 
-        } catch (e) {
-            console.error("Email sending failed", e);
-        }
+        // Fire and forget - don't await, don't block response
+        (async () => {
+            try {
+                // Fetch order with course and user details for email
+                const order = await prisma.order.findFirst({
+                    where: {
+                        gatewayOrderId: req.body.razorpay_order_id,
+                    },
+                    include: {
+                        course: { select: { id: true, title: true } },
+                        user: { select: { firstName: true, email: true } },
+                        payment: { select: { gatewayPaymentId: true } },
+                    },
+                });
+
+                if (order && order.user.email) {
+                    const emailHtml = paymentSuccessTemplate({
+                        firstName: order.user.firstName,
+                        courseName: order.course.title,
+                        courseId: order.course.id,
+                        amount: order.amount,
+                        currency: order.currency,
+                        orderId: order.gatewayOrderId || `ORD-${order.id}`,
+                        paymentId: order.payment?.gatewayPaymentId || req.body.razorpay_payment_id || 'N/A',
+                        purchaseDate: order.createdAt,
+                    });
+
+                    await sendMail(
+                        order.user.email,
+                        `🎉 Payment Successful - ${order.course.title}`,
+                        emailHtml
+                    );
+                    logger.info(`Payment success email sent to ${order.user.email}`);
+                }
+            } catch (e: any) {
+                logger.error(`Failed to send payment success email: ${e.message}`);
+            }
+        })();
     }
 
     return res.status(200).json({
@@ -174,6 +206,57 @@ export const verifyCheckout = asyncHandler(async (req: Request, res: Response) =
     const userId = Number(req.user.id);
 
     const result = await PaymentService.verifyCartPayment(userId, req.body);
+
+    // Send Cart Checkout Email in background (Fire and Forget)
+    if (result.success) {
+        (async () => {
+            try {
+                // Fetch all orders from this checkout with course and user details
+                const orders = await prisma.order.findMany({
+                    where: {
+                        userId,
+                        gatewayOrderId: req.body.razorpay_order_id,
+                        status: 'COMPLETED',
+                    },
+                    include: {
+                        course: { select: { id: true, title: true } },
+                        user: { select: { firstName: true, email: true } },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                });
+
+                const firstOrder = orders[0];
+                if (orders.length > 0 && firstOrder && firstOrder.user.email) {
+                    const items = orders.map(order => ({
+                        courseName: order.course.title,
+                        courseId: order.course.id,
+                        amount: order.amount,
+                    }));
+
+                    const totalAmount = orders.reduce((sum, o) => sum + o.amount, 0);
+
+                    const emailHtml = cartPaymentSuccessTemplate({
+                        firstName: firstOrder.user.firstName,
+                        items,
+                        totalAmount,
+                        currency: firstOrder.currency,
+                        orderId: firstOrder.gatewayOrderId || `ORD-${firstOrder.id}`,
+                        paymentId: req.body.razorpay_payment_id || 'N/A',
+                        purchaseDate: firstOrder.createdAt,
+                    });
+
+                    await sendMail(
+                        firstOrder.user.email,
+                        `🛒 Order Confirmed - ${items.length} Course${items.length > 1 ? 's' : ''} Purchased`,
+                        emailHtml
+                    );
+                    logger.info(`Cart payment success email sent to ${firstOrder.user.email}`);
+                }
+            } catch (e: any) {
+                logger.error(`Failed to send cart payment success email: ${e.message}`);
+            }
+        })();
+    }
 
     return res.status(200).json({
         success: true,

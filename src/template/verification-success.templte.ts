@@ -1,96 +1,112 @@
-import { COMPANY } from "../COMPANY";
+import { COMPANY } from '../COMPANY';
+import { getEmailWrapper, getEmailFooter, EMAIL_THEME } from './email-theme';
 
+/**
+ * Account Verification Success Email Template
+ * Sent when a user successfully verifies their email
+ */
 export const accountVerificationSuccessTemplate = (firstName: string): string => {
-    return `
-        <!DOCTYPE html>
-        <html>
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Account Verification Success</title>
-                <style>
-                    body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                        background-color: #f5f5f5;
-                        margin: 0;
-                        padding: 0;
-                    }
-                    .container {
-                        max-width: 600px;
-                        margin: 20px auto;
-                        background-color: #ffffff;
-                        border-radius: 8px;
-                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                        overflow: hidden;
-                    }
-                    .header {
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        padding: 40px 20px;
-                        text-align: center;
-                    }
-                    .header h1 {
-                        margin: 0;
-                        font-size: 28px;
-                    }
-                    .content {
-                        padding: 40px 20px;
-                        text-align: center;
-                    }
-                    .success-icon {
-                        font-size: 48px;
-                        margin-bottom: 20px;
-                    }
-                    .content h2 {
-                        color: #333;
-                        margin: 20px 0;
-                        font-size: 24px;
-                    }
-                    .content p {
-                        color: #666;
-                        line-height: 1.6;
-                        margin: 15px 0;
-                    }
-                    .cta-button {
-                        display: inline-block;
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        padding: 12px 30px;
-                        text-decoration: none;
-                        border-radius: 4px;
-                        margin-top: 20px;
-                        font-weight: bold;
-                    }
-                    .cta-button:hover {
-                        opacity: 0.9;
-                    }
-                    .footer {
-                        background-color: #f9f9f9;
-                        padding: 20px;
-                        text-align: center;
-                        color: #999;
-                        font-size: 12px;
-                        border-top: 1px solid #eee;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>Welcome!</h1>
-                    </div>
-                    <div class="content">
-                        <div class="success-icon">✔️</div>
-                        <h2>Account Verified Successfully</h2>
-                        <p>Congratulations, ${firstName}!</p>
-                        <p>Your account has been verified and activated. You can now access all the features of our platform.</p>
-                        <a href="${COMPANY.website}/login" class="cta-button">Go to Login</a>
-                    </div>
-                    <div class="footer">
-                        <p>© ${new Date().getFullYear()} ${COMPANY.name}. All rights reserved.</p>
-                    </div>
-                </div>
-            </body>
-        </html>
+    const loginUrl = `${COMPANY.website}/login`;
+    const coursesUrl = `${COMPANY.website}`;
+
+    const content = `
+        <div class="email-header">
+            <div class="email-logo">${COMPANY.name}</div>
+            <div class="email-header-icon">🎊</div>
+            <h1 class="email-header-title">You're All Set!</h1>
+            <p class="email-header-subtitle">Account verified successfully</p>
+        </div>
+        
+        <div class="email-content">
+            <div style="text-align: center; margin-bottom: 32px;">
+                <span class="success-badge">
+                    ✓ Email Verified
+                </span>
+            </div>
+
+            <p class="greeting">Congratulations, ${firstName}! 🎉</p>
+            
+            <p class="message">
+                Your email has been verified and your account is now fully activated.
+                You're ready to explore our courses and start your learning journey!
+            </p>
+
+            <!-- What You Can Do Now -->
+            <div class="info-card">
+                <p style="font-size: 16px; font-weight: 600; color: ${EMAIL_THEME.textPrimary}; margin: 0 0 20px 0;">
+                    ✨ What You Can Do Now
+                </p>
+                
+                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr>
+                        <td width="36" valign="top" style="padding-bottom: 16px;">
+                            <span style="font-size: 20px;">📚</span>
+                        </td>
+                        <td valign="top" style="padding-bottom: 16px; padding-left: 8px;">
+                            <p style="font-size: 14px; font-weight: 600; color: ${EMAIL_THEME.textPrimary}; margin: 0 0 4px 0;">
+                                Browse Courses
+                            </p>
+                            <p style="font-size: 13px; color: ${EMAIL_THEME.textMuted}; margin: 0;">
+                                Explore our wide range of courses
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td width="36" valign="top" style="padding-bottom: 16px;">
+                            <span style="font-size: 20px;">🛒</span>
+                        </td>
+                        <td valign="top" style="padding-bottom: 16px; padding-left: 8px;">
+                            <p style="font-size: 14px; font-weight: 600; color: ${EMAIL_THEME.textPrimary}; margin: 0 0 4px 0;">
+                                Add to Cart
+                            </p>
+                            <p style="font-size: 13px; color: ${EMAIL_THEME.textMuted}; margin: 0;">
+                                Save courses for later purchase
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td width="36" valign="top">
+                            <span style="font-size: 20px;">🎓</span>
+                        </td>
+                        <td valign="top" style="padding-left: 8px;">
+                            <p style="font-size: 14px; font-weight: 600; color: ${EMAIL_THEME.textPrimary}; margin: 0 0 4px 0;">
+                                Start Learning
+                            </p>
+                            <p style="font-size: 13px; color: ${EMAIL_THEME.textMuted}; margin: 0;">
+                                Enroll and learn at your own pace
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- CTA Buttons -->
+            <div style="text-align: center; margin: 32px 0;">
+                <a href="${loginUrl}" class="cta-button" style="margin-right: 12px;">
+                    Login Now
+                </a>
+                <a href="${coursesUrl}" class="secondary-button">
+                    Browse Courses
+                </a>
+            </div>
+
+            <hr class="divider">
+
+            <!-- Help Section -->
+            <p style="font-size: 13px; color: ${EMAIL_THEME.textMuted}; text-align: center;">
+                Need help getting started? Check out our 
+                <a href="${COMPANY.website}" style="color: ${EMAIL_THEME.accent}; text-decoration: none;">
+                    getting started guide
+                </a>
+                or contact us at 
+                <a href="mailto:${COMPANY.email}" style="color: ${EMAIL_THEME.accent}; text-decoration: none;">
+                    ${COMPANY.email}
+                </a>
+            </p>
+        </div>
+
+        ${getEmailFooter()}
     `;
+
+    return getEmailWrapper('Welcome to ' + COMPANY.name, content);
 };
