@@ -5,7 +5,7 @@ import fs from "fs";
 import asyncHandler from "../utils/async_handler.utils";
 import { CreateSectionDto } from "../dtos/section.dtos";
 import { prisma } from "../prisma";
-import { ValidationError } from "../utils/api_error.utils.";
+import { ValidationError } from "../utils/api_error.utils";
 import { cache, clearCacheByPrefix, COURSE_ADMIN_CACHE_PREFIX, COURSE_CACHE_PREFIX } from "../utils/cache";
 import { Request, Response } from "express";
 import { logger } from "../config/logger.config";

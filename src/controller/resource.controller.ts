@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import asyncHandler from "../utils/async_handler.utils";
 import { prisma } from "../prisma";
-import { ValidationError, NotFoundError, AuthError } from "../utils/api_error.utils.";
+import { ValidationError, NotFoundError, AuthError } from "../utils/api_error.utils";
 import path from "path";
 import fs from "fs";
 import { logger } from "../config/logger.config";

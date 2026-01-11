@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { CreateLessonDto } from "../dtos/lesson.dtos";
 import { Request, Response } from "express";
-import { ValidationError } from "../utils/api_error.utils.";
+import { ValidationError } from "../utils/api_error.utils";
 import { prisma } from "../prisma";
 import { cache, clearCacheByPrefix, COURSE_ADMIN_CACHE_PREFIX, COURSE_CACHE_PREFIX } from "../utils/cache";
 

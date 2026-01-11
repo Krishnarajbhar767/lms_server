@@ -1,7 +1,7 @@
 import { prisma } from "../prisma";
 import asyncHandler from "../utils/async_handler.utils";
 import { Request, Response } from "express";
-import { ValidationError } from "../utils/api_error.utils.";
+import { ValidationError } from "../utils/api_error.utils";
 import { upsertQuizeSchema } from "../validation/quize.validation";
 import { logger } from "../config/logger.config";
 

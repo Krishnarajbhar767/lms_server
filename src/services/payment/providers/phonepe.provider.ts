@@ -1,5 +1,5 @@
 import { PaymentProvider } from "@prisma/client";
-import { NotImplementedError } from "../../../utils/api_error.utils.";
+import { NotImplementedError } from "../../../utils/api_error.utils";
 import {
     IPaymentProvider,
     CreateOrderParams,

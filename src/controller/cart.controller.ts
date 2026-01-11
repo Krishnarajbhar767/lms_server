@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import asyncHandler from "../utils/async_handler.utils";
 import { prisma } from "../prisma";
-import { ValidationError, NotFoundError } from "../utils/api_error.utils.";
+import { ValidationError, NotFoundError } from "../utils/api_error.utils";
 import { AddToCartDto, RemoveFromCartDto } from "../dtos/cart.dtos";
 
 const getOrCreateCart = async (userId: number) => {

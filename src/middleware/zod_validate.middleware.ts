@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
-import { ValidationError } from '../utils/api_error.utils.';
+import { ValidationError } from '../utils/api_error.utils';
 import { logger } from '../config/logger.config';
 
 

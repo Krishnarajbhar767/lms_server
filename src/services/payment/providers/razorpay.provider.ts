@@ -2,7 +2,7 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import { PaymentProvider } from "@prisma/client";
 import { logger } from "../../../config/logger.config";
-import { InternalError, ValidationError } from "../../../utils/api_error.utils.";
+import { InternalError, ValidationError } from "../../../utils/api_error.utils";
 import {
     IPaymentProvider,
     CreateOrderParams,

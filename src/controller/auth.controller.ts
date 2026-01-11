@@ -2,7 +2,7 @@
 
 import { Request, Response } from "express";
 import asyncHandler from "../utils/async_handler.utils";
-import { ApiError } from "../utils/api_error.utils.";
+import { ApiError } from "../utils/api_error.utils";
 import { ChangePasswordDTO, ForgotPasswordDTO, ForgotPasswordResetDTO, LoginDTO, RegisterDTO } from "../dtos/auth.dtos";
 import { prisma } from "../prisma";
 import bcrypt from "bcrypt";

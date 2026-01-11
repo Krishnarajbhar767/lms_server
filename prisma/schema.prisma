@@ -204,13 +204,13 @@ model LessonProgress {
 }
 
 model Certificate {
-  id       Int      @id @default(autoincrement())
-  userId   Int
-  courseId Int
-  pdfUrl   String
-  issuedAt DateTime @default(now())
-  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            Int      @id @default(autoincrement())
+  certificateId String   @unique @default(uuid())
+  userId        Int
+  courseId      Int
+  issuedAt      DateTime @default(now())
+  course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
 }

@@ -2,7 +2,7 @@ import asyncHandler from "../utils/async_handler.utils";
 import { Request, Response } from "express";
 import { prisma } from "../prisma";
 import { CreateCategoryDTO } from "../dtos/category.dtos";
-import { ApiError } from "../utils/api_error.utils.";
+import { ApiError } from "../utils/api_error.utils";
 import { cache, clearCacheByPrefix, CATEGORY_CACHE_PREFIX, CATEGORY_ADMIN_CACHE_PREFIX } from "../utils/cache";
 
 const createCategory = asyncHandler(async (req: Request<{}, {}, CreateCategoryDTO>, res: Response) => {

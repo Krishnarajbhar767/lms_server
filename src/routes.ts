@@ -9,6 +9,7 @@ import { quizeRouter } from './routes/quize.routes';
 import { cartRouter } from './routes/cart.routes';
 import { paymentRouter } from './routes/payment.routes';
 import resourceRouter from './routes/resource.routes';
+import { certificateRouter } from './routes/certificate.routes';
 import { isAdmin, isAuthenticated } from './middleware/auth.middleware';
 
 
@@ -34,6 +35,8 @@ router.use('/cart', cartRouter);
 router.use('/payment', paymentRouter);
 // Protected Resource Routes
 router.use('/resource', resourceRouter);
+// Certificate Routes
+router.use('/certificate', certificateRouter);
 
 
 export default router;

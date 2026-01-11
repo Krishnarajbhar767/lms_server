@@ -1,6 +1,6 @@
 import { prisma } from "../../prisma";
 import { logger } from "../../config/logger.config";
-import { ValidationError, NotFoundError, InternalError } from "../../utils/api_error.utils.";
+import { ValidationError, NotFoundError, InternalError } from "../../utils/api_error.utils";
 import { PaymentProvider } from "@prisma/client";
 import { getPaymentProvider, getActiveProviderName, getPaymentProviderByName } from "./payment.factory";
 

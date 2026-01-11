@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import asyncHandler from "../utils/async_handler.utils";
 import { CreateCourseDto } from "../dtos/course.dtos";
 import { prisma } from "../prisma";
-import { ValidationError } from "../utils/api_error.utils.";
+import { ValidationError } from "../utils/api_error.utils";
 import fs from "fs";
 import path from "path";
 import { UploadedFile } from "express-fileupload";

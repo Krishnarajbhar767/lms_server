@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { ApiError } from "../utils/api_error.utils.";
+import { ApiError } from "../utils/api_error.utils";
 import jwt from "jsonwebtoken";
 import { ROLE } from "../global.types";
 import { logger } from "../config/logger.config";

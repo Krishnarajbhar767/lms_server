@@ -2,7 +2,7 @@
 import axios from "axios";
 import { Request, Response } from "express";
 import asyncHandler from "../utils/async_handler.utils";
-import { ValidationError, AuthError, NotFoundError } from "../utils/api_error.utils.";
+import { ValidationError, AuthError, NotFoundError } from "../utils/api_error.utils";
 import { prisma } from "../prisma";
 
 import crypto from "crypto";
