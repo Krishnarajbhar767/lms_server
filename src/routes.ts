@@ -10,7 +10,7 @@ import { cartRouter } from './routes/cart.routes';
 import { paymentRouter } from './routes/payment.routes';
 import resourceRouter from './routes/resource.routes';
 import { certificateRouter } from './routes/certificate.routes';
-import { isAdmin, isAuthenticated } from './middleware/auth.middleware';
+import reviewRouter from './routes/review.routes';
 
 
 const router = Router();
@@ -37,6 +37,8 @@ router.use('/payment', paymentRouter);
 router.use('/resource', resourceRouter);
 // Certificate Routes
 router.use('/certificate', certificateRouter);
+// Review Routes
+router.use('/reviews', reviewRouter);
 
 
 export default router;

@@ -288,6 +288,14 @@ export const getCourseById = asyncHandler(async (req: Request<{ id: string }>, r
                     }
                 },
                 orderBy: { order: "asc" }
+            },
+            reviews: {
+                include: {
+                    user: {
+                        select: { firstName: true, lastName: true }
+                    }
+                },
+                orderBy: { createdAt: "desc" }
             }
         }
     })

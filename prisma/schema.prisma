@@ -69,6 +69,8 @@ model Course {
   thumbnail        String
   language         String[]
   whatYouWillLearn String[]
+  averageRating    Float            @default(0)
+  reviewCount      Int              @default(0)
   certificates     Certificate[]
   category         Category?        @relation(fields: [categoryId], references: [id])
   progress         CourseProgress[]
@@ -222,6 +224,7 @@ model Review {
   userId    Int
   courseId  Int
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
