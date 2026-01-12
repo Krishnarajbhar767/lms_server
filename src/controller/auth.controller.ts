@@ -13,6 +13,7 @@ import { sendMail } from "../utils/send_mail.utils";
 import { accountVerificationSuccessTemplate } from "../template/verification-success.templte";
 import { ROLE } from "../global.types";
 import { forgotPasswordTemplate } from "../template/forgot-password.template";
+import { createSession, invalidateSession, invalidateAllSessions, validateSession } from "../services/session.service";
 
 export const register = asyncHandler(async (req: Request<{}, {}, RegisterDTO>, res: Response) => {
     const { firstName, lastName, email, password } = req.body;
@@ -100,28 +101,32 @@ export const login = asyncHandler(async (req: Request<{}, {}, LoginDTO>, res: Re
     if (!isPasswordValid) {
         throw new ApiError(401, 'Invalid password');
     }
-    // step 3 : generate access token and refresh token
+
+    // step 3 : create session
+    const sessionId = await createSession(user.id);
+
+    // step 4 : generate tokens with session id
     const accessToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
+        { id: user.id, email: user.email, role: user.role, sessionId },
         process.env.ACCESS_TOKEN_SECRET as string,
         { expiresIn: '30m' }
     );
 
     const refreshToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
+        { id: user.id, email: user.email, role: user.role, sessionId },
         process.env.REFRESH_TOKEN_SECRET as string,
         { expiresIn: '7d' }
     );
 
-    // send refresh token as cookies
+    // step 5 : send refresh token as cookie
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: true,
         maxAge: 7 * 24 * 60 * 60 * 1000
-    })
+    });
 
-    // step 5 : send response
-    res.success(`Welcome ${user.firstName}`, accessToken)
+    // step 6 : send response
+    res.success(`Welcome ${user.firstName}`, accessToken);
 })
 
 export const refreshToken = asyncHandler(async (req: Request, res: Response) => {
@@ -132,47 +137,65 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
     // step 2 : verify refresh token
     let decoded: any;
     try {
-        decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as { id: string, email: string, role: ROLE };
+        decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as { id: string, email: string, role: ROLE, sessionId?: string };
     } catch (error) {
         throw new ApiError(401, 'Invalid refresh token');
     }
-    // step 3 : find user by id
+
+    // step 3 : validate session
+    if (decoded.sessionId) {
+        const isValid = await validateSession(decoded.sessionId);
+        if (!isValid) {
+            throw new ApiError(401, 'Session invalid, please login again');
+        }
+    }
+
+    // step 4 : find user by id
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) {
         throw new ApiError(404, 'User not found');
     }
-    // step 4 : generate access token and refresh token
+
+    // step 5 : generate new tokens with session id
     const accessToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
+        { id: user.id, email: user.email, role: user.role, sessionId: decoded.sessionId },
         process.env.ACCESS_TOKEN_SECRET as string,
         { expiresIn: '30m' }
     );
 
     const newRefreshToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
+        { id: user.id, email: user.email, role: user.role, sessionId: decoded.sessionId },
         process.env.REFRESH_TOKEN_SECRET as string,
         { expiresIn: '7d' }
     );
 
-    // send refresh token as cookies
+    // step 6 : send refresh token as cookie
     res.cookie("refreshToken", newRefreshToken, {
         httpOnly: true,
         secure: true,
         maxAge: 7 * 24 * 60 * 60 * 1000
-    })
+    });
 
-    res.success('Refresh token generated successfully', { accessToken })
+    res.success('Refresh token generated successfully', { accessToken });
 })
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
-    const refreshToken = req.cookies.refreshToken;
-    if (!refreshToken) {
-        throw new ApiError(401, 'Refresh token is required');
+    // Invalidate session if token provided
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as any;
+            if (decoded.sessionId) {
+                await invalidateSession(decoded.sessionId);
+            }
+        } catch {
+            // Token invalid, continue
+        }
     }
+
     res.clearCookie('refreshToken');
     res.success('User logged out successfully');
-
-})
+});
 
 export const changePassword = asyncHandler(async (req: Request<{}, {}, ChangePasswordDTO>, res: Response) => {
     const { oldPassword, newPassword } = req.body;
@@ -188,8 +211,13 @@ export const changePassword = asyncHandler(async (req: Request<{}, {}, ChangePas
     }
     // step 3 : hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    // step 4 : update user's password
+
+    // step 4 : update password
     await prisma.user.update({ where: { email: user.email }, data: { password: hashedPassword, passwordResetToken: null } });
+
+    // step 5 : invalidate all sessions for security
+    await invalidateAllSessions(user.id);
+
     res.success('Password changed successfully');
 })
 

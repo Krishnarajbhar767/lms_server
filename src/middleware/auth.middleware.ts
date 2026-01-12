@@ -3,6 +3,7 @@ import { ApiError } from "../utils/api_error.utils";
 import jwt from "jsonwebtoken";
 import { ROLE } from "../global.types";
 import { logger } from "../config/logger.config";
+import { validateSession, updateSessionActivity } from "../services/session.service";
 
 
 export const isAuthenticated = async (req: Request, res: Response, next: NextFunction) => {
@@ -13,9 +14,22 @@ export const isAuthenticated = async (req: Request, res: Response, next: NextFun
     }
     let decoded: any;
     try {
-        decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as { id: string, email: string, role: ROLE };
+        decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as { id: string, email: string, role: ROLE, sessionId?: string };
+
+        // Validate session if present
+        if (decoded.sessionId) {
+            const isValid = await validateSession(decoded.sessionId);
+            if (!isValid) {
+                throw new ApiError(401, 'Session expired, please login again');
+            }
+            
+            // Update session activity timestamp
+            updateSessionActivity(decoded.sessionId).catch(() => {});
+        }
+
         req.user = decoded;
     } catch (error) {
+        if (error instanceof ApiError) throw error;
         throw new ApiError(401, 'Invalid access token');
     }
     next();

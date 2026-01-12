@@ -1,5 +1,5 @@
 import 'express';
-// ROLE 
+
 export type ROLE = "ADMIN" | "STUDENT"
 
 
@@ -16,10 +16,9 @@ declare global {
       user: {
         id: string;
         email: string;
-        role: ROLE
+        role: ROLE;
+        sessionId?: string;
       };
     }
   }
 }
-
-

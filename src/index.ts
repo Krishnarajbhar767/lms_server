@@ -17,6 +17,8 @@ import dotenv from 'dotenv';
 import { logger } from './config/logger.config';
 import path from 'path';
 import fileUpload from 'express-fileupload';
+import cron from 'node-cron';
+import { cleanupOldSessions } from './jobs/session-cleanup.job';
 
 dotenv.config();
 const app = express();
@@ -70,15 +72,6 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads"), {
     }
   }
 }));
-
-// Removed unsecured resource serving - now using protected endpoint
-// Resources are now served through /api/resource/view/:resourceId with enrollment verification
-// app.use("/resource", express.static(path.join(__dirname, "../resource"), {
-//   setHeaders: (res, filePath) => {
-//     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-//   }
-// }));
-
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 // cors config
 
@@ -106,4 +99,12 @@ app.use(globalErrorHandler);
 
 app.listen(process.env.PORT, () => {
   logger.info(`Server running on  http://localhost:${process.env.PORT}`);
+
+  // Schedule session cleanup job to run daily at 2 AM
+  cron.schedule('0 2 * * *', async () => {
+    logger.info('Running scheduled session cleanup');
+    await cleanupOldSessions();
+  });
+
+  logger.info('Session cleanup job scheduled for 2 AM daily');
 });

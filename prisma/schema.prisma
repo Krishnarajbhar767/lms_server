@@ -27,6 +27,7 @@ model User {
   cart               Cart?
   orders             Order[]
   quizAttempts       QuizAttempt[]
+  sessions           Session[]
 }
 
 model Category {
@@ -283,4 +284,15 @@ enum CourseStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  userId     Int
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
 }
