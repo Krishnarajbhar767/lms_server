@@ -38,8 +38,8 @@ app.use(helmet());
 
 // Rate limiting to prevent DDoS
 const limiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 200, // 200 requests per windowMs per IP
+  windowMs: 2 * 60 * 1000, // 2 minutes
+  max: 100, // 100 requests per windowMs per IP
   message: { success: false, message: 'Too many requests, please try again later.' },
   standardHeaders: true, // Return rate limit info in headers
   legacyHeaders: false,

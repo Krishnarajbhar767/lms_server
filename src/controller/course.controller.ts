@@ -8,7 +8,7 @@ import path from "path";
 import { UploadedFile } from "express-fileupload";
 import { slugify } from "../utils/slugify.utils";
 
-import { cache, clearCacheByPrefix, COURSE_ADMIN_CACHE_PREFIX, COURSE_CACHE_PREFIX } from "../utils/cache";
+import { getCache, setCache, clearCacheByPrefix, COURSE_ADMIN_CACHE_PREFIX, COURSE_CACHE_PREFIX } from "../utils/cache";
 
 
 // Extend Request type locally for this file
@@ -81,9 +81,9 @@ export const createCourse = asyncHandler(async (req: Request<{}, {}, CreateCours
         }
     })
 
-    // clear all cache related to courses when new course is created
-    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
-    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX)
+    // clear cache when new course is created
+    await clearCacheByPrefix(COURSE_CACHE_PREFIX)
+    await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX)
 
     res.success("Course created successfully", course, 201)
 })
@@ -110,9 +110,9 @@ export const updateCourse = asyncHandler(async (req: Request<{ id: string }, {},
         }
     })
 
-    // clear all cache related to courses when course is updated
-    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
-    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX)
+    // clear cache when course is updated
+    await clearCacheByPrefix(COURSE_CACHE_PREFIX)
+    await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX)
 
     res.success("Course updated successfully", course, 200)
 })
@@ -129,9 +129,9 @@ export const archiveCourse = asyncHandler(async (req: Request<{ id: string }>, r
     }
     const course = await prisma.course.update({ where: { id: Number(id) }, data: { status: "ARCHIVED" } })
 
-    // clear all cache related to courses when course is archived
-    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
-    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX)
+    // clear cache when course is archived
+    await clearCacheByPrefix(COURSE_CACHE_PREFIX)
+    await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX)
 
     res.success("Course archived successfully", course)
 })
@@ -143,9 +143,9 @@ export const getAllCoursesForAdmin = asyncHandler(async (req: Request, res: Resp
     const skip = (page - 1) * limit
 
     const cacheKey = `${COURSE_ADMIN_CACHE_PREFIX}p${page}_l${limit}`
-    const cache_data = await cache.get(cacheKey)
-    if (cache_data) {
-        return res.success("Courses fetched successfully", cache_data)
+    const cachedData = await getCache(cacheKey)
+    if (cachedData) {
+        return res.success("Courses fetched successfully", cachedData)
     }
     // get all courses  based based on lates courses based on updated at and created at
     const [courses, totalCourses] = await Promise.all([
@@ -173,7 +173,7 @@ export const getAllCoursesForAdmin = asyncHandler(async (req: Request, res: Resp
         }
     }
 
-    cache.set(cacheKey, responseData)
+    await setCache(cacheKey, responseData)
     res.success("Courses fetched successfully", responseData)
 })
 
@@ -188,9 +188,9 @@ export const getAllCoursesForStudent = asyncHandler(async (req: Request, res: Re
 
     // Build cache key with all params
     const cacheKey = `${COURSE_CACHE_PREFIX}p${page}_l${limit}_s${search || ""}_c${categoryId || ""}_sb${sortBy}`
-    const cache_data = await cache.get(cacheKey)
-    if (cache_data) {
-        return res.success("Courses fetched successfully cache", cache_data)
+    const cachedData = await getCache(cacheKey)
+    if (cachedData) {
+        return res.success("Courses fetched successfully", cachedData)
     }
 
     // Build where clause
@@ -251,14 +251,14 @@ export const getAllCoursesForStudent = asyncHandler(async (req: Request, res: Re
         }
     }
 
-    cache.set(cacheKey, responseData)
+    await setCache(cacheKey, responseData)
     res.success("Courses fetched successfully", responseData)
 })
 
 // Clear all cache - Admin only
 export const clearAllCache = asyncHandler(async (_req: Request, res: Response) => {
-    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
-    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX)
+    await clearCacheByPrefix(COURSE_CACHE_PREFIX)
+    await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX)
     res.success("All cache cleared successfully", null)
 })
 
@@ -341,9 +341,9 @@ export const updateCourseStatus = asyncHandler(async (req: Request<{ id: string 
         throw new ValidationError('Course not found')
     }
     const course = await prisma.course.update({ where: { id: Number(id) }, data: { status: status } })
-    // clear all cache related to courses when course is published
-    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
-    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX)
+    // clear cache when course status changes
+    await clearCacheByPrefix(COURSE_CACHE_PREFIX)
+    await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX)
     res.success("Course published successfully", course)
 })
 

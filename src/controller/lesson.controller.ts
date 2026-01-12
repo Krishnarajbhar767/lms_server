@@ -5,7 +5,7 @@ import { CreateLessonDto } from "../dtos/lesson.dtos";
 import { Request, Response } from "express";
 import { ValidationError } from "../utils/api_error.utils";
 import { prisma } from "../prisma";
-import { cache, clearCacheByPrefix, COURSE_ADMIN_CACHE_PREFIX, COURSE_CACHE_PREFIX } from "../utils/cache";
+import { clearCacheByPrefix, COURSE_ADMIN_CACHE_PREFIX, COURSE_CACHE_PREFIX } from "../utils/cache";
 
 import { logger } from "../config/logger.config";
 import { deleteBunnyVideo } from "../utils/delete-bunny-video";
@@ -75,9 +75,9 @@ export const createLesson = asyncHandler(async (req: Request<{}, {}, CreateLesso
             },
         },
     });
-    // clear node cache for courses
-    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX);
-    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX);
+    // clear cache
+    await clearCacheByPrefix(COURSE_CACHE_PREFIX);
+    await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX);
     return res.success("Lesson created successfully", course, 201);
 })
 
@@ -163,9 +163,9 @@ export const deleteResource = asyncHandler(async (req: Request<{ id: string }>, 
         where: { id: resourceId },
     });
 
-    // 3. Clear Cache
-    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX);
-    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX);
+    // clear cache
+    await clearCacheByPrefix(COURSE_CACHE_PREFIX);
+    await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX);
 
     // 4. Return Latest Course
     const course = await prisma.course.findUnique({
@@ -251,9 +251,9 @@ export const deleteLesson = asyncHandler(async (req: Request<{ id: string }>, re
         where: { id: lessonId },
     });
 
-    // Clear caches to reflect changes immediately
-    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX);
-    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX);
+    // clear cache
+    await clearCacheByPrefix(COURSE_CACHE_PREFIX);
+    await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX);
 
     res.success("Lesson deleted successfully", {}, 200);
 });
@@ -315,8 +315,8 @@ export const reorderLessons = asyncHandler(
             );
 
             // clear cache
-            clearCacheByPrefix(cache, COURSE_CACHE_PREFIX);
-            clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX);
+            await clearCacheByPrefix(COURSE_CACHE_PREFIX);
+            await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX);
 
             return res.success("Lessons reordered successfully", updatedLessons, 200);
         } catch (error) {
@@ -402,8 +402,8 @@ export const updateLesson = asyncHandler(async (req: Request<{ id: string }>, re
         },
     });
 
-    clearCacheByPrefix(cache, COURSE_CACHE_PREFIX);
-    clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX);
+    await clearCacheByPrefix(COURSE_CACHE_PREFIX);
+    await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX);
 
     return res.success("Lesson updated successfully", course, 200);
 });

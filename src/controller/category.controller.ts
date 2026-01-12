@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import { prisma } from "../prisma";
 import { CreateCategoryDTO } from "../dtos/category.dtos";
 import { ApiError } from "../utils/api_error.utils";
-import { cache, clearCacheByPrefix, CATEGORY_CACHE_PREFIX, CATEGORY_ADMIN_CACHE_PREFIX } from "../utils/cache";
+import { getCache, setCache, clearCacheByPrefix, CATEGORY_CACHE_PREFIX, CATEGORY_ADMIN_CACHE_PREFIX } from "../utils/cache";
 
 const createCategory = asyncHandler(async (req: Request<{}, {}, CreateCategoryDTO>, res: Response) => {
     const { name, description } = req.body;
@@ -13,9 +13,9 @@ const createCategory = asyncHandler(async (req: Request<{}, {}, CreateCategoryDT
     }
     const category = await prisma.category.create({ data: { name: name.toLowerCase().trim(), description } });
 
-    // clear all cache related to categories
-    clearCacheByPrefix(cache, CATEGORY_CACHE_PREFIX);
-    clearCacheByPrefix(cache, CATEGORY_ADMIN_CACHE_PREFIX);
+    // clear cache
+    await clearCacheByPrefix(CATEGORY_CACHE_PREFIX);
+    await clearCacheByPrefix(CATEGORY_ADMIN_CACHE_PREFIX);
 
     res.success("Category created successfully", category, 201);
 });
@@ -29,9 +29,9 @@ const updateCategory = asyncHandler(async (req: Request<{ id: string }, {}, Crea
     }
     const updatedCategory = await prisma.category.update({ where: { id: Number(id) }, data: { name: name.toLowerCase().trim(), description } });
 
-    // clear all cache related to categories
-    clearCacheByPrefix(cache, CATEGORY_CACHE_PREFIX);
-    clearCacheByPrefix(cache, CATEGORY_ADMIN_CACHE_PREFIX);
+    // clear cache
+    await clearCacheByPrefix(CATEGORY_CACHE_PREFIX);
+    await clearCacheByPrefix(CATEGORY_ADMIN_CACHE_PREFIX);
 
     res.success("Category updated successfully", updatedCategory, 200);
 })
@@ -74,9 +74,9 @@ const deleteCategory = asyncHandler(async (req: Request<{ id: string }, {}, { ta
 
     const deletedCategory = await prisma.category.delete({ where: { id } });
 
-    // clear all cache related to categories
-    clearCacheByPrefix(cache, CATEGORY_CACHE_PREFIX);
-    clearCacheByPrefix(cache, CATEGORY_ADMIN_CACHE_PREFIX);
+    // clear cache
+    await clearCacheByPrefix(CATEGORY_CACHE_PREFIX);
+    await clearCacheByPrefix(CATEGORY_ADMIN_CACHE_PREFIX);
 
     res.success("Category deleted successfully", deletedCategory, 200);
 })
@@ -84,10 +84,10 @@ const deleteCategory = asyncHandler(async (req: Request<{ id: string }, {}, { ta
 // Public Endpoint - Only returns categories with courses
 const getAllCategories = asyncHandler(async (req: Request, res: Response) => {
     const cacheKey = `${CATEGORY_CACHE_PREFIX}all`;
-    const cachedCategories = await cache.get(cacheKey);
+    const cachedCategories = await getCache(cacheKey);
 
     if (cachedCategories) {
-        return res.success('Categories fetched successfully cached', cachedCategories, 200);
+        return res.success('Categories fetched successfully', cachedCategories, 200);
     }
 
     // Only return categories that have at least one PUBLISHED course (public endpoint)
@@ -113,17 +113,17 @@ const getAllCategories = asyncHandler(async (req: Request, res: Response) => {
         }
     });
 
-    cache.set(cacheKey, categories);
-    res.success('Categories fetched successfully uncached', categories, 200);
+    await setCache(cacheKey, categories);
+    res.success('Categories fetched successfully', categories, 200);
 })
 
 // Admin Endpoint - Returns ALL categories
 const getAdminCategories = asyncHandler(async (req: Request, res: Response) => {
     const cacheKey = `${CATEGORY_ADMIN_CACHE_PREFIX}all`;
-    const cachedCategories = await cache.get(cacheKey);
+    const cachedCategories = await getCache(cacheKey);
 
     if (cachedCategories) {
-        return res.success('All categories fetched successfully', cachedCategories, 200);
+        return res.success('Categories fetched successfully', cachedCategories, 200);
     }
 
     const categories = await prisma.category.findMany({
@@ -137,13 +137,13 @@ const getAdminCategories = asyncHandler(async (req: Request, res: Response) => {
         }
     });
 
-    cache.set(cacheKey, categories);
-    res.success('All categories fetched successfully', categories, 200);
+    await setCache(cacheKey, categories);
+    res.success('Categories fetched successfully', categories, 200);
 })
 
 const getCategoryById = asyncHandler(async (req: Request<{ id: string }>, res: Response) => {
     const id = req.params.id
-    const cachedCategory = await cache.get(CATEGORY_CACHE_PREFIX + id);
+    const cachedCategory = await getCache(CATEGORY_CACHE_PREFIX + id);
     if (cachedCategory) {
         return res.success('Category fetched successfully', cachedCategory, 200);
     }
@@ -152,7 +152,7 @@ const getCategoryById = asyncHandler(async (req: Request<{ id: string }>, res: R
         throw new ApiError(404, 'Category not found');
     }
     // cache category
-    cache.set(CATEGORY_CACHE_PREFIX + id, category);
+    await setCache(CATEGORY_CACHE_PREFIX + id, category);
     res.success('Category fetched successfully', category, 200);
 })
 export {

@@ -6,7 +6,7 @@ import asyncHandler from "../utils/async_handler.utils";
 import { CreateSectionDto } from "../dtos/section.dtos";
 import { prisma } from "../prisma";
 import { ValidationError } from "../utils/api_error.utils";
-import { cache, clearCacheByPrefix, COURSE_ADMIN_CACHE_PREFIX, COURSE_CACHE_PREFIX } from "../utils/cache";
+import { clearCacheByPrefix, COURSE_ADMIN_CACHE_PREFIX, COURSE_CACHE_PREFIX } from "../utils/cache";
 import { Request, Response } from "express";
 import { logger } from "../config/logger.config";
 export const createSection = asyncHandler(
@@ -54,9 +54,9 @@ export const createSection = asyncHandler(
                 order: nextOrder,
             },
         });
-        // clear all cache related to courses when new course is created
-        clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
-        clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX)
+        // clear cache
+        await clearCacheByPrefix(COURSE_CACHE_PREFIX)
+        await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX)
         return res.success("Section created successfully", section, 201);
     }
 );
@@ -104,9 +104,9 @@ export const updateSection = asyncHandler(
             where: { id: sectionId },
             data: { title: normalizedTitle },
         });
-        // clear all cache related to courses when new course is created
-        clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
-        clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX)
+        // clear cache
+        await clearCacheByPrefix(COURSE_CACHE_PREFIX)
+        await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX)
         return res.success("Section updated successfully", updated, 200);
     }
 );
@@ -191,10 +191,10 @@ export const reorderSection = asyncHandler(
                     })
                 )
             );
-            // clear all cache related to courses when new course is created
-            clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
+            // clear cache
+            await clearCacheByPrefix(COURSE_CACHE_PREFIX)
             logger.info("Sections reordered successfully");
-            clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX)
+            await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX)
 
             return res.success("Sections reordered successfully", updatedSections, 200);
         } catch (error) {
@@ -263,9 +263,9 @@ export const deleteSection = asyncHandler(
         await prisma.section.delete({
             where: { id: sectionId },
         });
-        // clear all cache related to courses when new course is created
-        clearCacheByPrefix(cache, COURSE_CACHE_PREFIX)
-        clearCacheByPrefix(cache, COURSE_ADMIN_CACHE_PREFIX)
+        // clear cache
+        await clearCacheByPrefix(COURSE_CACHE_PREFIX)
+        await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX)
         return res.success("Section deleted successfully", null, 200);
     }
 )
