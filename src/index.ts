@@ -74,32 +74,13 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads"), {
     }
   }
 }));
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-// CORS Configuration - Allowed origins whitelist
-const allowedOrigins: string[] = [
-  FRONTEND_URL,
-  'http://localhost:3000',
-];
 
 app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, Postman, server-to-server)
-      if (!origin) {
-        return callback(null, true);
-      }
-      
-      // Check if origin is in the allowed list
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      
-      // Reject other origins
-      return callback(new Error(`Origin ${origin} not allowed by CORS`), false);
-    },
-    credentials: true,
-  }),
+ cors({
+  origin:"https://msmajadari.xyz",
+  credentials:true
+ })
 );
 // using cookies parser for safe cookies parsing
 app.use(cookieParser());
