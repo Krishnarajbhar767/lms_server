@@ -5,11 +5,12 @@ import {
   forgotPasswordResetSchema,
   forgotPasswordSchema,
   loginSchema,
-  registerWithoutOtpSchema
+  registerWithoutOtpSchema,
+  resendVerificationEmailSchema
 } from '../validation/auth.validation';
 import { validate } from '../middleware/zod_validate.middleware';
 
-import { changePassword, forgotPasswordRequest, forgotPasswordReset, getProfile, login, logout, refreshToken, register, verifyEmail } from '../controller/auth.controller';
+import { changePassword, forgotPasswordRequest, forgotPasswordReset, getProfile, login, logout, refreshToken, register, verifyEmail, resendVerificationEmail } from '../controller/auth.controller';
 import { isAuthenticated } from '../middleware/auth.middleware';
 
 
@@ -20,6 +21,9 @@ authRouter.post('/register', validate(registerWithoutOtpSchema), register);
 // Verify Registration OTP
 // https://localhost:3000/api/auth/verify-email
 authRouter.post('/verify-email', verifyEmail)
+// Resend verification email (2 min cooldown)
+// https://localhost:3000/api/auth/resend-verification
+authRouter.post('/resend-verification', validate(resendVerificationEmailSchema), resendVerificationEmail)
 
 // Login By Email Or Username
 // https://localhost:3000/api/auth/login

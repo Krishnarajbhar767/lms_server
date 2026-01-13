@@ -62,3 +62,8 @@ export const forgotPasswordResetSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   error: 'Passwords do not match',
 });
+
+export const resendVerificationEmailSchema = z.object({
+  email: z.email({ error: 'Valid email is required' }).toLowerCase(),
+});
+

@@ -8,7 +8,7 @@ import { prisma } from "../prisma";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { accountVerificationTemplate } from "../template/account-verification.template";
-
+import { redis } from '../config/redis.config';
 import { sendMail } from "../utils/send_mail.utils";
 import { accountVerificationSuccessTemplate } from "../template/verification-success.templte";
 import { ROLE } from "../global.types";
@@ -294,3 +294,70 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
     }
     res.success('User profile fetched successfully', data, 200);
 })
+
+const RESEND_COOLDOWN_KEY = 'resend_cooldown:';
+const RESEND_DAILY_COUNT_KEY = 'resend_daily:';
+const RESEND_COOLDOWN_SECONDS = 300; // 5 minutes
+const RESEND_DAILY_LIMIT = 5; // max 5 emails per day
+const RESEND_DAILY_TTL = 86400; // 24 hours
+
+export const resendVerificationEmail = asyncHandler(async (req: Request<{}, {}, { email: string }>, res: Response) => {
+    const { email } = req.body;
+    const normalizedEmail = email.toLowerCase();
+    
+    // find user by email
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (!user) {
+        // dont reveal if user exists or not for security
+        throw new ApiError(400, 'If this email exists, a verification link will be sent');
+    }
+    
+    // check if already verified
+    if (user.isActive) {
+        throw new ApiError(400, 'Account is already verified');
+    }
+    
+    // check cooldown 5 minutes between requests
+    const cooldownKey = RESEND_COOLDOWN_KEY + normalizedEmail;
+    const cooldownActive = await redis.get(cooldownKey);
+    if (cooldownActive) {
+        const ttl = await redis.ttl(cooldownKey);
+        const minutes = Math.ceil(ttl / 60);
+        throw new ApiError(429, `Please wait ${minutes} minute(s) before requesting another verification email`);
+    }
+    
+    // check daily limit max 5 per day
+    const dailyKey = RESEND_DAILY_COUNT_KEY + normalizedEmail;
+    const dailyCount = await redis.get(dailyKey);
+    const count = dailyCount ? parseInt(dailyCount) : 0;
+    
+    if (count >= RESEND_DAILY_LIMIT) {
+        throw new ApiError(429, 'Daily limit reached. Please try again tomorrow');
+    }
+    
+    // generate verification token
+    const verificationToken = jwt.sign({ email: user.email }, process.env.EMAIL_VERIFICATION_SECRET as string);
+    const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+    const emailTemplate = accountVerificationTemplate({ firstName: user.firstName, verificationLink });
+    
+    // send email
+    try {
+        await sendMail(user.email, 'Account Verification', emailTemplate);
+    } catch (error) {
+        throw new ApiError(500, 'Failed to send verification email. Please try again later');
+    }
+    
+    // set 5 minute cooldown
+    await redis.set(cooldownKey, '1', 'EX', RESEND_COOLDOWN_SECONDS);
+    
+    // increment daily count
+    if (count === 0) {
+        await redis.set(dailyKey, '1', 'EX', RESEND_DAILY_TTL);
+    } else {
+        await redis.incr(dailyKey);
+    }
+    
+    res.success('Verification email sent successfully');
+});
+
+

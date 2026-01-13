@@ -2,12 +2,13 @@
 import { logger } from '../config/logger.config';
 import { transporter } from '../config/node_mailer.config';
 import { ApiError } from './api_error.utils';
-
+import { COMPANY } from '../COMPANY';
 export const sendMail = async (to: string, subject: string, html: string) => {
   try {
+    const EMAIL_USER = process.env.EMAIL_USER;
     // not using await here to avoid blocking
     const info = await transporter.sendMail({
-      from: `"QURAN LMS" <${process.env.EMAIL_USER}>`,
+      from: `${COMPANY.name} <${EMAIL_USER}>`,
       to,
       subject,
       html,
@@ -16,6 +17,6 @@ export const sendMail = async (to: string, subject: string, html: string) => {
     return info;
   } catch (error: any) {
     logger.error(`Unable to send email: ${error.message || error}`);
-    throw error
+    throw new ApiError(500, error.message || error || "INTERNAL_SERVER_ERROR");
   }
 };

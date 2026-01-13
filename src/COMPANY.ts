@@ -1,8 +1,8 @@
 export const COMPANY = {
-    name: "Your Company Name",
+    name: "Majdari",
     email: "info@yourcompany.com",
     phone: "+1-800-000-0000",
-    website: "https://www.yourcompany.com",
+    website: "https://msmajadari.xyz",
     address: {
         street: "123 Business Avenue",
         city: "New York",
