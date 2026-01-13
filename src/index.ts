@@ -22,6 +22,8 @@ import { cleanupOldSessions } from './jobs/session-cleanup.job';
 
 dotenv.config();
 const app = express();
+// Enable trust proxy for rate limiting behind proxies
+app.set('trust proxy', 1);
 // use express file upload for get file from user
 app.use(fileUpload({
   useTempFiles: true,
