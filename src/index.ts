@@ -64,10 +64,11 @@ if (process.env.NODE_ENV === 'production') {
 app.use("/uploads", (req:Request, res:Response, next:NextFunction) => {
   // Block access to /resource directory (paid content)
   if (req.path.startsWith('/resource/') || req.path.includes('/resource/')) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       message: "Resource Are Not Allowed Publically"
     });
+    return;
   }
   // Allow thumbnails 
   next();
