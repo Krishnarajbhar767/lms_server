@@ -44,9 +44,11 @@ export const createBunnyVideo = asyncHandler(async (req: Request, res: Response)
 })
 
 export const getBunnyConfig = asyncHandler(async (req: Request, res: Response) => {
+    // SECURITY: Only return libraryId (read-only, safe for frontend)
+    // NEVER expose apiKey - it grants write access to entire CDN
     return res.success("Bunny config fetched", {
-        libraryId: BUNNY_LIBRARY_ID,
-        apiKey: BUNNY_API_KEY
+        libraryId: BUNNY_LIBRARY_ID
+        // apiKey removed - write operations handled server-side only
     })
 })
 
