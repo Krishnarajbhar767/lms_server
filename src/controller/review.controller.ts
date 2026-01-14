@@ -119,25 +119,39 @@ export const submitReview = asyncHandler(async (req: Request, res: Response) => 
  */
 export const getCourseReviews = asyncHandler(async (req: Request, res: Response) => {
     const courseId = Number(req.params.courseId)
+    const page = Number(req.query.page) || 1
+    const limit = Number(req.query.limit) || 10
+    const skip = (page - 1) * limit
 
     if (!courseId || isNaN(courseId)) {
         throw new ApiError(400, "Invalid course ID")
     }
 
-    const reviews = await prisma.review.findMany({
-        where: { courseId },
-        orderBy: { createdAt: "desc" },
-        include: {
-            user: {
-                select: { firstName: true, lastName: true }
+    const [reviews, totalReviews] = await Promise.all([
+        prisma.review.findMany({
+            where: { courseId },
+            skip,
+            take: limit,
+            orderBy: { createdAt: "desc" },
+            include: {
+                user: {
+                    select: { firstName: true, lastName: true }
+                }
             }
-        }
-    })
+        }),
+        prisma.review.count({ where: { courseId } })
+    ])
 
     return res.status(200).json({
         success: true,
         message: "Reviews fetched successfully",
-        data: reviews
+        data: {
+            reviews,
+            totalReviews,
+            totalPages: Math.ceil(totalReviews / limit),
+            currentPage: page,
+            limit
+        }
     })
 })
 
