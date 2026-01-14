@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 
 import helmet from 'helmet';
@@ -57,16 +57,23 @@ if (process.env.NODE_ENV === 'production') {
       }
     })
   );
-} else {
+}else{
   app.use(morgan('dev'));
 }
-// Let allow user file upload
-app.use("/uploads", express.static(path.join(__dirname, "../uploads"), {
-  setHeaders: (res, filePath) => {
-    // 1. Fix the original error by adding this header
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
-    // 2. Correct your MIME type logic (ensure correct extension check)
+app.use("/uploads", (req:Request, res:Response, next:NextFunction) => {
+  // Block access to /resource directory (paid content)
+  if (req.path.startsWith('/resource/') || req.path.includes('/resource/')) {
+    return res.status(404).json({
+      success: false,
+      message: "Resource Are Not Allowed Publically"
+    });
+  }
+  // Allow thumbnails 
+  next();
+}, express.static(path.join(__dirname, "../uploads"), {
+  setHeaders: (res, filePath) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     if (filePath.endsWith('.png')) {
       res.setHeader('Content-Type', 'image/png');
     } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
@@ -75,10 +82,10 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads"), {
   }
 }));
 
-
 app.use(
  cors({
   origin:"https://msmajadari.xyz",
+  // origin:'http://localhost:5173',
   credentials:true
  })
 );
