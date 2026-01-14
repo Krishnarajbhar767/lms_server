@@ -8,7 +8,6 @@ import { validateSession, updateSessionActivity } from "../services/session.serv
 
 export const isAuthenticated = async (req: Request, res: Response, next: NextFunction) => {
     const token = req.header("Authorization")?.replace("Bearer ", "") || req.headers.authorization?.split(" ")[1];
-    logger.info('TOKEN IN BACKEND', token)
     if (!token) {
         throw new ApiError(401, 'Access token is required');
     }
