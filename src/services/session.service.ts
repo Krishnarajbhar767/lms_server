@@ -2,7 +2,7 @@ import { prisma } from '../prisma';
 import { redis } from '../config/redis.config';
 
 const SESSION_KEY = 'session:';
-const SESSION_TTL = 3600; // 1 hour
+const SESSION_TTL = 604800; // 7 days in seconds exact as refresh token
 
 // create new session and invalidate all previous sessions for the user
 export const createSession = async (userId: number): Promise<string> => {

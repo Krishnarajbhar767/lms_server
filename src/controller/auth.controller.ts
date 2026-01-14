@@ -142,18 +142,16 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
         throw new ApiError(401, 'Invalid refresh token');
     }
 
-    // step 3 : validate or recreate session (hybrid approach)
-    let sessionId = decoded.sessionId;
+    // step 3 : validate session (must exist and be valid)
     if (decoded.sessionId) {
         const isValid = await validateSession(decoded.sessionId);
         if (!isValid) {
-            // This allows users to stay logged in for refresh token lifetime 7d
-            // without forced password re-entry after 1h idle timeout
-            sessionId = await createSession(decoded.id);
-        } else {
-            // Session still valid - just update activity timestamp
-            updateSessionActivity(decoded.sessionId).catch(() => {});
+            // Session expired or invalidated (e.g. password reset)
+            // User must login again
+            throw new ApiError(401, 'Session expired, please login again');
         }
+        // Session valid - update activity to extend TTL
+        updateSessionActivity(decoded.sessionId).catch(() => {});
     }
 
     // step 4 : find user by id
@@ -162,15 +160,15 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
         throw new ApiError(404, 'User not found');
     }
 
-    // step 5 : generate new tokens with session id (may be new or existing)
+    // step 5 : generate new tokens with same session id
     const accessToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role, sessionId: sessionId },
+        { id: user.id, email: user.email, role: user.role, sessionId: decoded.sessionId },
         process.env.ACCESS_TOKEN_SECRET as string,
         { expiresIn: '30m' }
     );
 
     const newRefreshToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role, sessionId: sessionId },
+        { id: user.id, email: user.email, role: user.role, sessionId: decoded.sessionId },
         process.env.REFRESH_TOKEN_SECRET as string,
         { expiresIn: '7d' }
     );
@@ -278,10 +276,15 @@ export const forgotPasswordReset = asyncHandler(async (req: Request<{}, {}, Forg
     }
     // step 3 : hash new password
     const hashedPassword = await bcrypt.hash(password, 10);
-    // step 4 : update user's password
+    // step 4 : update user's password and invalidate reset token
     await prisma.user.update({ where: { email: user.email }, data: { password: hashedPassword, passwordResetToken: null } });
-    // step 5 : invalidate token without db
-    res.success('Password reset successfully');
+    
+    // step 5 : invalidate all active sessions
+    // Forces logout from all devices to prevent account takeover
+    // If attacker changed password, old sessions can't be used
+    await invalidateAllSessions(decoded.id);
+    
+    res.success('Password reset successfully. Please login with your new password.');
 })
 
 export const getProfile = asyncHandler(async (req: Request, res: Response) => {
