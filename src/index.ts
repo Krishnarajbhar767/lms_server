@@ -110,8 +110,13 @@ app.listen(process.env.PORT, () => {
 
   // Schedule session cleanup job to run daily at 2 AM
   cron.schedule('0 2 * * *', async () => {
-    logger.info('Running scheduled session cleanup');
-    await cleanupOldSessions();
+    try {
+      logger.info('Running scheduled session cleanup');
+      await cleanupOldSessions();
+      logger.info('Session cleanup completed successfully');
+    } catch (error) {
+      logger.error('Session cleanup cron job failed:', error);
+    }
   });
 
   logger.info('Session cleanup job scheduled for 2 AM daily');
