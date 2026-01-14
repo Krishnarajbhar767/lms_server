@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import asyncHandler from "../utils/async_handler.utils";
 import { CreateCourseDto } from "../dtos/course.dtos";
 import { prisma } from "../prisma";
-import { ValidationError } from "../utils/api_error.utils";
+import { InternalError, ValidationError } from "../utils/api_error.utils";
 import fs from "fs";
 import path from "path";
 import { UploadedFile } from "express-fileupload";
@@ -68,19 +68,27 @@ export const createCourse = asyncHandler(async (req: Request<{}, {}, CreateCours
     if (isExistingCourse) {
         throw new ValidationError('Course already exists with this exact title')
     }
-    const course = await prisma.course.create({
-        data: {
-            title: title.toLowerCase().trim(),
-            description: description.toLowerCase().trim(),
-            price,
-            originalPrice: originalPrice || null,
-            categoryId,
-            thumbnail,
-            language: language.map((l: string) => l.toLowerCase()),
-            whatYouWillLearn: whatYouWillLearn || []
+    let course;
+    try {
+        course = await prisma.course.create({
+            data: {
+                title: title.toLowerCase().trim(),
+                description: description.toLowerCase().trim(),
+                price,
+                originalPrice: originalPrice || null,
+                categoryId,
+                thumbnail,
+                language: language.map((l: string) => l.toLowerCase()),
+                whatYouWillLearn: whatYouWillLearn || []
+            }
+        })
+    } catch (error: any) {
+        // Handle unique constraint violation
+        if (error.code === 'P2002' && error.meta?.target?.includes('title')) {
+            throw new ValidationError('Course already exists with this exact title');
         }
-    })
-
+        throw new InternalError()
+    }
     // clear cache when new course is created
     await clearCacheByPrefix(COURSE_CACHE_PREFIX)
     await clearCacheByPrefix(COURSE_ADMIN_CACHE_PREFIX)
