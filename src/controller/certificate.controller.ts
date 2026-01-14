@@ -22,7 +22,7 @@ function generateCertificateId(): string {
 export const getUserCertificates = asyncHandler(async (req: Request, res: Response) => {
     const userId = Number(req.user.id);
 
-    // Get all enrollments with course details and progress
+    // Single query - gets enrollments with course, progress, and certificates in one DB call
     const enrollments = await prisma.enrollment.findMany({
         where: { userId },
         include: {
@@ -31,44 +31,29 @@ export const getUserCertificates = asyncHandler(async (req: Request, res: Respon
                     id: true,
                     title: true,
                     thumbnail: true,
+                    progress: {
+                        where: { userId },
+                        select: { percentage: true },
+                        take: 1
+                    },
+                    certificates: {
+                        where: { userId },
+                        select: {
+                            id: true,
+                            certificateId: true,
+                            issuedAt: true
+                        },
+                        take: 1
+                    }
                 }
             }
         }
     });
 
-    // Get progress for all enrolled courses
-    const progressRecords = await prisma.courseProgress.findMany({
-        where: { userId },
-        select: {
-            courseId: true,
-            percentage: true,
-        }
-    });
-
-    // Create a map for quick progress lookup
-    const progressMap = new Map(progressRecords.map(p => [p.courseId, p.percentage]));
-
-    // Get existing certificates
-    const certificates = await prisma.certificate.findMany({
-        where: { userId },
-        include: {
-            course: {
-                select: {
-                    id: true,
-                    title: true,
-                    thumbnail: true,
-                }
-            }
-        }
-    });
-
-    // Create certificate map for quick lookup
-    const certificateMap = new Map(certificates.map(c => [c.courseId, c]));
-
-    // Build response with course progress and certificate status
+    // Build response - same format as before for frontend compatibility
     const coursesWithCertificateStatus = enrollments.map(enrollment => {
-        const progress = progressMap.get(enrollment.courseId) ?? 0;
-        const certificate = certificateMap.get(enrollment.courseId);
+        const progress = enrollment.course.progress[0]?.percentage ?? 0;
+        const cert = enrollment.course.certificates[0];
         
         return {
             courseId: enrollment.courseId,
@@ -76,10 +61,10 @@ export const getUserCertificates = asyncHandler(async (req: Request, res: Respon
             thumbnail: enrollment.course.thumbnail,
             progress: Math.round(progress),
             isEligible: progress >= 100,
-            certificate: certificate ? {
-                id: certificate.id,
-                certificateId: certificate.certificateId,
-                issuedAt: certificate.issuedAt,
+            certificate: cert ? {
+                id: cert.id,
+                certificateId: cert.certificateId,
+                issuedAt: cert.issuedAt,
             } : null,
         };
     });
