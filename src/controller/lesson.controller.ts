@@ -418,9 +418,9 @@ export const markLessonComplete = asyncHandler(async (req: Request<{ id: string 
         throw new ValidationError("Invalid lesson id");
     }
 
-    // Must watch at least 50%
-    if (!watchedPercentage || watchedPercentage < 50) {
-        throw new ValidationError("Please watch at least 50% of the video");
+    // Must watch at least 90%
+    if (!watchedPercentage || watchedPercentage < 90) {
+        throw new ValidationError("Please watch at least 90% of the video");
     }
 
     // Get lesson and verify enrollment
@@ -436,27 +436,42 @@ export const markLessonComplete = asyncHandler(async (req: Request<{ id: string 
     });
     if (!enrollment) throw new ValidationError("Not enrolled in this course");
 
-    // Mark lesson as complete
-    await prisma.lessonProgress.upsert({
-        where: { lessonId_userId: { lessonId, userId } },
-        create: { lessonId, userId, isComplete: true, completedAt: new Date() },
-        update: { isComplete: true, completedAt: new Date() }
+    // Wrap in transaction for atomic
+    // Prevents progress mismatch if server crashes mid-operation
+    const result = await prisma.$transaction(async (tx) => {
+        // 1. Mark lesson as complete
+        await tx.lessonProgress.upsert({
+            where: { lessonId_userId: { lessonId, userId } },
+            create: { lessonId, userId, isComplete: true, completedAt: new Date() },
+            update: { isComplete: true, completedAt: new Date() }
+        });
+
+        // 2. Calculate course progress (within transaction for consistency)
+        const totalLessons = await tx.lesson.count({ 
+            where: { section: { courseId } } 
+        });
+        
+        const completedLessons = await tx.lessonProgress.count({
+            where: { 
+                userId, 
+                isComplete: true, 
+                lesson: { section: { courseId } } 
+            }
+        });
+
+        const percentage = Math.round((completedLessons / totalLessons) * 100);
+
+        // 3. Update course progress (same transaction)
+        await tx.courseProgress.upsert({
+            where: { userId_courseId: { userId, courseId } },
+            create: { userId, courseId, percentage },
+            update: { percentage }
+        });
+
+        return { percentage, lessonId };
     });
 
-    // Update course progress percentage
-    const totalLessons = await prisma.lesson.count({ where: { section: { courseId } } });
-    const completedLessons = await prisma.lessonProgress.count({
-        where: { userId, isComplete: true, lesson: { section: { courseId } } }
-    });
-    const percentage = Math.round((completedLessons / totalLessons) * 100);
-
-    await prisma.courseProgress.upsert({
-        where: { userId_courseId: { userId, courseId } },
-        create: { userId, courseId, percentage },
-        update: { percentage }
-    });
-
-    res.success("Lesson completed", { percentage, lessonId });
+    res.success("Lesson completed", result);
 });
 
 // Save watch progress
