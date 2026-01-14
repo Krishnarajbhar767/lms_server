@@ -37,8 +37,8 @@ export const register = asyncHandler(async (req: Request<{}, {}, RegisterDTO>, r
     };
     // step 3 : create user
     const user = await prisma.user.create({ data: userData });
-    // step 4 : create jwt token for email verification
-    const verificationToken = jwt.sign({ email: user.email }, process.env.EMAIL_VERIFICATION_SECRET as string);
+    // step 4 : create jwt token for email verification expires in 24 hours
+    const verificationToken = jwt.sign({ email: user.email }, process.env.EMAIL_VERIFICATION_SECRET as string, { expiresIn: '24h' });
     // step 5 : main verification url
     const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
     // step 6 : generate email template
@@ -345,7 +345,7 @@ export const resendVerificationEmail = asyncHandler(async (req: Request<{}, {}, 
     }
     
     // generate verification token
-    const verificationToken = jwt.sign({ email: user.email }, process.env.EMAIL_VERIFICATION_SECRET as string);
+    const verificationToken = jwt.sign({ email: user.email }, process.env.EMAIL_VERIFICATION_SECRET as string,{ expiresIn: '24h' });
     const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
     const emailTemplate = accountVerificationTemplate({ firstName: user.firstName, verificationLink });
     
