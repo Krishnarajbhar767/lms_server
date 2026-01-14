@@ -81,6 +81,9 @@ model Course {
   sections         Section[]
   cartItems        CartItem[]
   orders           Order[]
+
+  @@index([status, createdAt])    // Hot path: "Get published courses sorted by date"
+  @@index([categoryId, status])   // Hot path: "Get published courses by category"
 }
 
 model Section {
@@ -162,6 +165,8 @@ model Enrollment {
   payment   Payment?
 
   @@unique([userId, courseId])
+  @@index([userId])       // Hot path: "Get user enrollments"
+  @@index([courseId])     // Hot path: "Get course enrollees"
 }
 
 model Payment {
@@ -180,6 +185,9 @@ model Payment {
   enrollment       Enrollment      @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
   user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([userId])       // Hot path: "Get user payment history"
+  @@index([status])       // Hot path: "Find pending payments"
 }
 
 model CourseProgress {
@@ -191,6 +199,8 @@ model CourseProgress {
   user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
+  @@index([userId])       // Hot path: "Dashboard - all user progress"
+  @@index([courseId])     // Future: "Course completion analytics"
 }
 
 model LessonProgress {
@@ -204,6 +214,8 @@ model LessonProgress {
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([lessonId, userId])
+  @@index([userId, isComplete])  // Hot path: "Count completed lessons for progress calc"
+  @@index([lessonId])            // Hot path: "Get all users who completed lesson"
 }
 
 model Certificate {
@@ -216,6 +228,7 @@ model Certificate {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
+  @@index([userId])       // Hot path: "Get all user certificates"
 }
 
 model Review {
@@ -230,6 +243,7 @@ model Review {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
+  @@index([courseId, createdAt])  // Hot path: "Get course reviews ordered by date"
 }
 
 model Order {
@@ -242,10 +256,14 @@ model Order {
   gatewayOrderId String?         @unique
   provider       PaymentProvider
   createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  updatedAt      DateTime        @default(now()) @updatedAt
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   course         Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
   payment        Payment?
+
+  @@index([userId, status])       // Hot path: "Get user pending orders"
+  @@index([userId, createdAt])    // Hot path: "Purchase history sorted by date"
+  @@index([courseId])             //"Course sales analytics"
 }
 
 model AppSettings {
