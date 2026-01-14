@@ -13,7 +13,7 @@ import { sendMail } from "../utils/send_mail.utils";
 import { accountVerificationSuccessTemplate } from "../template/verification-success.templte";
 import { ROLE } from "../global.types";
 import { forgotPasswordTemplate } from "../template/forgot-password.template";
-import { createSession, invalidateSession, invalidateAllSessions, validateSession } from "../services/session.service";
+import { createSession, invalidateSession, invalidateAllSessions, validateSession, updateSessionActivity } from "../services/session.service";
 
 export const register = asyncHandler(async (req: Request<{}, {}, RegisterDTO>, res: Response) => {
     const { firstName, lastName, email, password } = req.body;
@@ -142,11 +142,17 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
         throw new ApiError(401, 'Invalid refresh token');
     }
 
-    // step 3 : validate session
+    // step 3 : validate or recreate session (hybrid approach)
+    let sessionId = decoded.sessionId;
     if (decoded.sessionId) {
         const isValid = await validateSession(decoded.sessionId);
         if (!isValid) {
-            throw new ApiError(401, 'Session invalid, please login again');
+            // This allows users to stay logged in for refresh token lifetime 7d
+            // without forced password re-entry after 1h idle timeout
+            sessionId = await createSession(decoded.id);
+        } else {
+            // Session still valid - just update activity timestamp
+            updateSessionActivity(decoded.sessionId).catch(() => {});
         }
     }
 
@@ -156,15 +162,15 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
         throw new ApiError(404, 'User not found');
     }
 
-    // step 5 : generate new tokens with session id
+    // step 5 : generate new tokens with session id (may be new or existing)
     const accessToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role, sessionId: decoded.sessionId },
+        { id: user.id, email: user.email, role: user.role, sessionId: sessionId },
         process.env.ACCESS_TOKEN_SECRET as string,
         { expiresIn: '30m' }
     );
 
     const newRefreshToken = jwt.sign(
-        { id: user.id, email: user.email, role: user.role, sessionId: decoded.sessionId },
+        { id: user.id, email: user.email, role: user.role, sessionId: sessionId },
         process.env.REFRESH_TOKEN_SECRET as string,
         { expiresIn: '7d' }
     );
