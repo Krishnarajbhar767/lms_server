@@ -11,6 +11,7 @@ import { paymentRouter } from './routes/payment.routes';
 import resourceRouter from './routes/resource.routes';
 import { certificateRouter } from './routes/certificate.routes';
 import reviewRouter from './routes/review.routes';
+import { dashboardRouter } from './routes/dashboard.routes';
 
 
 const router = Router();
@@ -39,6 +40,8 @@ router.use('/resource', resourceRouter);
 router.use('/certificate', certificateRouter);
 // Review Routes
 router.use('/reviews', reviewRouter);
+// Admin Dashboard Routes
+router.use('/admin', dashboardRouter);
 
 
 export default router;
