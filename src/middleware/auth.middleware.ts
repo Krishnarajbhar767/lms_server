@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/api_error.utils";
 import jwt from "jsonwebtoken";
-import { ROLE } from "../global.types";
+import { JWTPayload } from "../global.types";
 import { logger } from "../config/logger.config";
 import { validateSession, updateSessionActivity } from "../services/session.service";
 
@@ -11,9 +11,9 @@ export const isAuthenticated = async (req: Request, res: Response, next: NextFun
     if (!token) {
         throw new ApiError(401, 'Access token is required');
     }
-    let decoded: any;
+    let decoded: JWTPayload;
     try {
-        decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as { id: string, email: string, role: ROLE, sessionId?: string };
+        decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as JWTPayload;
 
         // Validate session if present
         if (decoded.sessionId) {
@@ -66,7 +66,7 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
 
     // Try to decode token
     try {
-        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as { id: string, email: string, role: ROLE };
+        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as JWTPayload;
         req.user = decoded;
     } catch (error) {
         logger.warn('Invalid token in optional auth, continuing without user');

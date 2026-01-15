@@ -11,7 +11,7 @@ import { accountVerificationTemplate } from "../template/account-verification.te
 import { redis } from '../config/redis.config';
 import { sendMail } from "../utils/send_mail.utils";
 import { accountVerificationSuccessTemplate } from "../template/verification-success.templte";
-import { ROLE } from "../global.types";
+import { JWTPayload, EmailVerificationPayload, ForgotPasswordPayload } from "../global.types";
 import { forgotPasswordTemplate } from "../template/forgot-password.template";
 import { createSession, invalidateSession, invalidateAllSessions, validateSession, updateSessionActivity } from "../services/session.service";
 
@@ -59,9 +59,9 @@ export const verifyEmail = asyncHandler(async (req: Request<{ token: string }, {
         throw new ApiError(400, 'Verification token is required');
     }
     // verify token
-    let decoded: any;
+    let decoded: EmailVerificationPayload;
     try {
-        decoded = jwt.verify(token, process.env.EMAIL_VERIFICATION_SECRET as string) as { email: string };
+        decoded = jwt.verify(token, process.env.EMAIL_VERIFICATION_SECRET as string) as EmailVerificationPayload;
     } catch (error) {
         throw new ApiError(400, 'Invalid or expired verification token');
     }
@@ -135,9 +135,9 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
         throw new ApiError(401, 'Refresh token is required');
     }
     // step 2 : verify refresh token
-    let decoded: any;
+    let decoded: JWTPayload;
     try {
-        decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as { id: string, email: string, role: ROLE, sessionId?: string };
+        decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as JWTPayload;
     } catch (error) {
         throw new ApiError(401, 'Invalid refresh token');
     }
@@ -188,7 +188,7 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
     const token = req.header("Authorization")?.replace("Bearer ", "");
     if (token) {
         try {
-            const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as any;
+            const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string) as JWTPayload;
             if (decoded.sessionId) {
                 await invalidateSession(decoded.sessionId);
             }
@@ -258,9 +258,9 @@ export const forgotPasswordRequest = asyncHandler(async (req: Request<{}, {}, Fo
 export const forgotPasswordReset = asyncHandler(async (req: Request<{}, {}, ForgotPasswordResetDTO>, res: Response) => {
     const { token, password } = req.body;
     // step 1 : verify forgot password token
-    let decoded: any;
+    let decoded: ForgotPasswordPayload;
     try {
-        decoded = jwt.verify(token, process.env.FORGOT_PASSWORD_SECRET as string) as { id: string, email: string, role: ROLE };
+        decoded = jwt.verify(token, process.env.FORGOT_PASSWORD_SECRET as string) as ForgotPasswordPayload;
     } catch (error) {
         throw new ApiError(401, 'Link is expired. Request for new link');
     }
