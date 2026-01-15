@@ -6,3 +6,5 @@ dist
 .gitignore
 .vscode 
 dist
+uploads
+resource
