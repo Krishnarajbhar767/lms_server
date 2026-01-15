@@ -18,6 +18,9 @@ model User {
   updatedAt          DateTime         @updatedAt
   isActive           Boolean          @default(false)
   passwordResetToken String?
+  isBlocked          Boolean          @default(false)
+  blockedAt          DateTime?
+  blockedReason      String?
   certificates       Certificate[]
   progress           CourseProgress[]
   lessonProgress     LessonProgress[]

@@ -96,6 +96,11 @@ export const login = asyncHandler(async (req: Request<{}, {}, LoginDTO>, res: Re
         throw new ApiError(403, 'Please verify your email to activate your account');
     }
 
+    // check if user is blocked
+    if (user.isBlocked) {
+        throw new ApiError(403, 'Your account has been blocked by the administrator. Please contact support.');
+    }
+
     // step 2 : compare password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
@@ -158,6 +163,11 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) {
         throw new ApiError(404, 'User not found');
+    }
+
+    // step 4.1 : check if user is blocked
+    if (user.isBlocked) {
+        throw new ApiError(403, 'Your account has been blocked by the administrator. Please contact support.');
     }
 
     // step 5 : generate new tokens with same session id
@@ -237,6 +247,10 @@ export const forgotPasswordRequest = asyncHandler(async (req: Request<{}, {}, Fo
     if (!user.isActive) {
         throw new ApiError(403, 'Please verify your email to reset your password');
     }
+    // check if user is blocked
+    if (user.isBlocked) {
+        throw new ApiError(403, 'Your account has been blocked by the administrator. Please contact support.');
+    }
     // step 2 : generate forgot password token
     const passwordResetToken = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
@@ -273,6 +287,10 @@ export const forgotPasswordReset = asyncHandler(async (req: Request<{}, {}, Forg
     // check is given token and user token is same or not
     if (user.passwordResetToken !== token) {
         throw new ApiError(401, 'Link is expired');
+    }
+    // check if user is blocked
+    if (user.isBlocked) {
+        throw new ApiError(403, 'Your account has been blocked by the administrator. Please contact support.');
     }
     // step 3 : hash new password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -324,6 +342,11 @@ export const resendVerificationEmail = asyncHandler(async (req: Request<{}, {}, 
     // check if already verified
     if (user.isActive) {
         throw new ApiError(400, 'Account is already verified');
+    }
+    
+    // check if user is blocked
+    if (user.isBlocked) {
+        throw new ApiError(403, 'Your account has been blocked by the administrator. Please contact support.');
     }
     
     // check cooldown 5 minutes between requests
