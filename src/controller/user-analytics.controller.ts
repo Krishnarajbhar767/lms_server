@@ -1,63 +1,12 @@
 import { Request, Response } from "express";
 import asyncHandler from "../utils/async_handler.utils";
 import { prisma } from "../prisma";
-import { getCache, setCache, DASHBOARD_CACHE_KEY } from "../utils/cache";
+import { getCache, setCache } from "../utils/cache";
 import { slugify } from "../utils/slugify.utils";
+import { DashboardAnalytics, MonthlyData, RecentOrder, QuizAnalytics, CourseQuizStats } from "./dashboard.controller";
+import { ApiError } from "../utils/api_error.utils";
 
-const DASHBOARD_CACHE_TTL = 300;
-const CACHE_KEY_VERSION = "v2"; // Force refresh for new fields
-
-export interface MonthlyData {
-    month: string;
-    value: number;
-}
-
-export interface RecentOrder {
-    id: number;
-    courseId: number;
-    courseName: string;
-    courseSlug: string;
-    userId: number;
-    userName: string;
-    userEmail: string;
-    amount: number;
-    status: string;
-    createdAt: Date;
-}
-
-export interface CourseQuizStats {
-    courseId: number;
-    courseName: string;
-    attempts: number;
-    avgScore: number;
-}
-
-export interface QuizAnalytics {
-    totalAttempts: number;
-    avgScore: number;
-    attemptsByMonth: MonthlyData[];
-    attemptsByDay: MonthlyData[];
-    byCourse: CourseQuizStats[];
-}
-
-export interface DashboardAnalytics {
-    totalUsers: number;
-    totalStudents: number;
-    totalCourses: number;
-    totalEnrollments: number;
-    totalCertificates: number;
-    totalRevenue: number;
-    revenueByMonth: MonthlyData[];
-    revenueByDay: MonthlyData[];
-    userRegistrationsByMonth: MonthlyData[];
-    userRegistrationsByDay: MonthlyData[];
-    enrollmentsByMonth: MonthlyData[];
-    enrollmentsByDay: MonthlyData[];
-    certificatesByMonth: MonthlyData[];
-    certificatesByDay: MonthlyData[];
-    recentOrders: RecentOrder[];
-    quizAnalytics: QuizAnalytics;
-}
+const USER_ANALYTICS_CACHE_TTL = 300; // 5 minutes
 
 function formatMonthYear(date: Date): string {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -105,10 +54,53 @@ function generateLast30DaysArray(): string[] {
     return days;
 }
 
-export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Response) => {
-    const cached = await getCache<DashboardAnalytics>(`${DASHBOARD_CACHE_KEY}:${CACHE_KEY_VERSION}`);
+// Extend DashboardAnalytics
+export interface UserDashboardAnalytics extends DashboardAnalytics {
+    user: {
+        id: number;
+        firstName: string;
+        lastName: string;
+        email: string;
+        role: string;
+        createdAt: Date;
+        lastLogin: Date | null;
+        isBlocked: boolean;
+        isActive: boolean;
+    }
+}
+
+export const getUserAnalytics = asyncHandler(async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.userId || "");
+
+    if (isNaN(userId)) {
+        throw new ApiError(400, "Invalid user ID");
+    }
+
+    const cacheKey = `user-analytics:${userId}`;
+    const cached = await getCache<UserDashboardAnalytics>(cacheKey);
     if (cached) {
-        return res.success("Dashboard analytics fetched from cache", cached);
+        return res.success("User analytics fetched from cache", cached);
+    }
+
+    // Verify user exists first
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+            id: true, 
+            firstName: true, 
+            lastName: true, 
+            email: true, 
+            role: true, 
+            createdAt: true,
+            isBlocked: true,
+            isActive: true
+            // we don't track last login explicitly in user table yet, maybe add later? 
+            // defaulting to null for now as per schema
+        }
+    });
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
     }
 
     const twelveMonthsAgo = getTwelveMonthsAgo();
@@ -117,49 +109,33 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
     const daysArray = generateLast30DaysArray();
 
     const [
-        totalUsers,
-        totalStudents,
-        totalCourses,
         totalEnrollments,
         totalCertificates,
-        revenueResult,
         completedOrders,
-        userRegistrations,
         enrollments,
         certificates,
         recentOrdersRaw,
-        quizAttemptsByMonth, // Keep specific date-filtered fetch for charts
-        quizCount,           // New: Global count
-        quizAvg,             // New: Global average
-        quizGrouped          // New: Grouped by quizId
+        quizAttemptsByMonth,
+        quizCount,
+        quizAvg,
+        quizGrouped
     ] = await prisma.$transaction([
-        prisma.user.count(),
-        prisma.user.count({ where: { role: "STUDENT" } }),
-        prisma.course.count({ where: { status: "PUBLISHED" } }),
-        prisma.enrollment.count(),
-        prisma.certificate.count(),
-        prisma.order.aggregate({
-            where: { status: "COMPLETED" },
-            _sum: { amount: true }
-        }),
+        prisma.enrollment.count({ where: { userId } }),
+        prisma.certificate.count({ where: { userId } }),
         prisma.order.findMany({
-            where: { status: "COMPLETED", createdAt: { gte: twelveMonthsAgo } },
+            where: { userId, status: "COMPLETED", createdAt: { gte: twelveMonthsAgo } },
             select: { amount: true, createdAt: true }
         }),
-        prisma.user.findMany({
-            where: { createdAt: { gte: twelveMonthsAgo } },
-            select: { createdAt: true }
-        }),
         prisma.enrollment.findMany({
-            where: { createdAt: { gte: twelveMonthsAgo } },
+            where: { userId, createdAt: { gte: twelveMonthsAgo } },
             select: { createdAt: true }
         }),
         prisma.certificate.findMany({
-            where: { issuedAt: { gte: twelveMonthsAgo } },
+            where: { userId, issuedAt: { gte: twelveMonthsAgo } },
             select: { issuedAt: true }
         }),
         prisma.order.findMany({
-            where: { status: "COMPLETED" },
+            where: { userId, status: "COMPLETED" },
             orderBy: { createdAt: "desc" },
             take: 10,
             select: {
@@ -174,36 +150,40 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
             }
         }),
         prisma.quizAttempt.findMany({
-            where: { createdAt: { gte: twelveMonthsAgo } },
+            where: { userId, createdAt: { gte: twelveMonthsAgo } },
             select: { createdAt: true }
         }),
-        prisma.quizAttempt.count(),
+        prisma.quizAttempt.count({ where: { userId } }),
         prisma.quizAttempt.aggregate({
+            where: { userId },
             _avg: { score: true }
         }),
         prisma.quizAttempt.groupBy({
             by: ['quizId'],
+            where: { userId },
             _count: { _all: true },
             _avg: { score: true },
             orderBy: { quizId: 'asc' }
         })
     ]);
 
-    // aggregate revenue by month
+    // Aggregate Revenue (Spending for User)
     const revenueMap = new Map<string, number>();
     monthsArray.forEach(month => revenueMap.set(month, 0));
     
-    // aggregate revenue by day
     const revenueDayMap = new Map<string, number>();
     daysArray.forEach(day => revenueDayMap.set(day, 0));
 
+    let totalSpent = 0;
+
+    // For user, revenue = spending
     completedOrders.forEach(order => {
+        totalSpent += order.amount;
         const month = formatMonthYear(order.createdAt);
         if (revenueMap.has(month)) {
             revenueMap.set(month, (revenueMap.get(month) || 0) + order.amount);
         }
         
-        // check if order is within last 30 days
         if (order.createdAt >= thirtyDaysAgo) {
             const day = formatDayMonth(order.createdAt);
             if (revenueDayMap.has(day)) {
@@ -218,42 +198,11 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
     }));
 
     const revenueByDay = daysArray.map(day => ({
-        month: day, // reusing 'month' key for compatibility with chart component structure
+        month: day,
         value: revenueDayMap.get(day) || 0
     }));
 
-    // aggregate user registrations by month and day
-    const usersMap = new Map<string, number>();
-    monthsArray.forEach(month => usersMap.set(month, 0));
-
-    const usersDayMap = new Map<string, number>();
-    daysArray.forEach(day => usersDayMap.set(day, 0));
-
-    userRegistrations.forEach(user => {
-        const month = formatMonthYear(user.createdAt);
-        if (usersMap.has(month)) {
-            usersMap.set(month, (usersMap.get(month) || 0) + 1);
-        }
-
-        if (user.createdAt >= thirtyDaysAgo) {
-            const day = formatDayMonth(user.createdAt);
-            if (usersDayMap.has(day)) {
-                usersDayMap.set(day, (usersDayMap.get(day) || 0) + 1);
-            }
-        }
-    });
-
-    const userRegistrationsByMonth = monthsArray.map(month => ({
-        month,
-        value: usersMap.get(month) || 0
-    }));
-
-    const userRegistrationsByDay = daysArray.map(day => ({
-        month: day,
-        value: usersDayMap.get(day) || 0
-    }));
-
-    // aggregate enrollments by month and day
+    // Enrollments
     const enrollmentsMap = new Map<string, number>();
     monthsArray.forEach(month => enrollmentsMap.set(month, 0));
 
@@ -284,7 +233,7 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
         value: enrollmentsDayMap.get(day) || 0
     }));
 
-    // aggregate certificates by month and day
+    // Certificates
     const certsMap = new Map<string, number>();
     monthsArray.forEach(month => certsMap.set(month, 0));
 
@@ -315,7 +264,7 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
         value: certsDayMap.get(day) || 0
     }));
 
-    // format recent orders
+    // Recent Orders
     const recentOrders: RecentOrder[] = recentOrdersRaw.map(order => ({
         id: order.id,
         courseId: order.courseId,
@@ -333,11 +282,10 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
         createdAt: order.createdAt
     }));
 
-    // quiz analytics
+    // Quiz Analytics
     const totalAttempts = quizCount;
     const avgScore = quizAvg._avg.score ? Math.round(quizAvg._avg.score) : 0;
 
-    // quiz attempts by month and day
     const attemptsMap = new Map<string, number>();
     monthsArray.forEach(month => attemptsMap.set(month, 0));
 
@@ -368,12 +316,10 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
         value: attemptsDayMap.get(day) || 0
     }));
 
-    // per-course quiz stats - optimize to avoid huge fetch
-    // fetch quiz details for the quizzes we have stats for
+    // Per-course quiz stats
     const quizIds = quizGrouped.map(g => g.quizId);
     
-    // In a real optimized scenario, we'd limit this or do it better, 
-    // but fetching details for unique quizes is better than all attempts
+    // Fetch unique quizzes
     const quizzes = await prisma.quize.findMany({
         where: { id: { in: quizIds } },
         select: {
@@ -428,17 +374,28 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
         byCourse
     };
 
-    const analytics: DashboardAnalytics = {
-        totalUsers,
-        totalStudents,
-        totalCourses,
+    const analytics: UserDashboardAnalytics = {
+        user: {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            role: user.role,
+            createdAt: user.createdAt,
+            lastLogin: null, // Placeholder
+            isBlocked: user.isBlocked,
+            isActive: user.isActive
+        },
+        totalUsers: 1, // Scoped to 1 user
+        totalStudents: user.role === 'STUDENT' ? 1 : 0,
+        totalCourses: 0, // Not applicable
         totalEnrollments,
         totalCertificates,
-        totalRevenue: revenueResult._sum.amount || 0,
+        totalRevenue: totalSpent,
         revenueByMonth,
         revenueByDay,
-        userRegistrationsByMonth,
-        userRegistrationsByDay,
+        userRegistrationsByMonth: [], // Not applicable
+        userRegistrationsByDay: [], // Not applicable
         enrollmentsByMonth,
         enrollmentsByDay,
         certificatesByMonth,
@@ -447,6 +404,6 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
         quizAnalytics
     };
 
-    await setCache(`${DASHBOARD_CACHE_KEY}:${CACHE_KEY_VERSION}`, analytics, DASHBOARD_CACHE_TTL);
-    return res.success("Dashboard analytics fetched", analytics);
+    await setCache(cacheKey, analytics, USER_ANALYTICS_CACHE_TTL);
+    return res.success("User analytics fetched", analytics);
 });

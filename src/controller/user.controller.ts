@@ -4,6 +4,7 @@ import { ApiError } from "../utils/api_error.utils";
 import { prisma } from "../prisma";
 import { invalidateAllSessions } from "../services/session.service";
 import { invalidateBlockCache } from "../middleware/auth.middleware";
+import { deleteCache } from "../utils/cache";
 import { sendMail } from "../utils/send_mail.utils";
 import { accountBlockedTemplate } from "../template/account-blocked.template";
 import { accountUnblockedTemplate } from "../template/account-unblocked.template";
@@ -12,10 +13,22 @@ import { accountUnblockedTemplate } from "../template/account-unblocked.template
 export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 100;
+    const search = (req.query.search as string) || "";
     const skip = (page - 1) * limit;
+
+    const whereClause = search
+        ? {
+              OR: [
+                  { firstName: { contains: search, mode: "insensitive" as const } },
+                  { lastName: { contains: search, mode: "insensitive" as const } },
+                  { email: { contains: search, mode: "insensitive" as const } }
+              ]
+          }
+        : {};
 
     const [users, total] = await Promise.all([
         prisma.user.findMany({
+            where: whereClause,
             skip,
             take: limit,
             orderBy: { createdAt: "desc" },
@@ -33,7 +46,7 @@ export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
                 _count: { select: { enrollments: true } }
             }
         }),
-        prisma.user.count()
+        prisma.user.count({ where: whereClause })
     ]);
 
     res.success("Users fetched successfully", {
@@ -82,7 +95,7 @@ export const blockUser = asyncHandler(async (req: Request, res: Response) => {
     }
 
     // block user
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
         where: { id: userId },
         data: {
             isBlocked: true,
@@ -102,7 +115,9 @@ export const blockUser = asyncHandler(async (req: Request, res: Response) => {
     });
     sendMail(user.email, "Account Suspended", emailTemplate).catch(() => {});
 
-    res.success("User blocked successfully");
+    await deleteCache(`user-analytics:${userId}`);
+    
+    return res.success("User blocked successfully", { user: updatedUser });
 });
 
 // unblock a user
@@ -127,7 +142,7 @@ export const unblockUser = asyncHandler(async (req: Request, res: Response) => {
         throw new ApiError(400, "User is not blocked");
     }
 
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
         where: { id: userId },
         data: {
             isBlocked: false,
@@ -145,6 +160,7 @@ export const unblockUser = asyncHandler(async (req: Request, res: Response) => {
     });
     sendMail(user.email, "Account Restored", emailTemplate).catch(() => {});
 
-    res.success("User unblocked successfully");
-});
+    await deleteCache(`user-analytics:${userId}`);
 
+    return res.success("User unblocked successfully", { user: updatedUser });
+});

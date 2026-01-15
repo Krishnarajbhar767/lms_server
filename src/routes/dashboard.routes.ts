@@ -12,3 +12,13 @@ dashboardRouter.get(
     isAdmin,
     getDashboardAnalytics
 );
+
+import { getUserAnalytics } from "../controller/user-analytics.controller";
+
+// admin user specific analytics endpoint
+dashboardRouter.get(
+    "/users/:userId/analytics",
+    isAuthenticated,
+    isAdmin,
+    getUserAnalytics
+);
