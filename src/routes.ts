@@ -13,6 +13,7 @@ import { certificateRouter } from './routes/certificate.routes';
 import reviewRouter from './routes/review.routes';
 import { dashboardRouter } from './routes/dashboard.routes';
 import userRouter from './routes/user.routes';
+import couponRouter from './routes/coupon.routes';
 
 
 const router = Router();
@@ -45,6 +46,9 @@ router.use('/reviews', reviewRouter);
 router.use('/admin', dashboardRouter);
 // Admin User Management Routes
 router.use('/admin/users', userRouter);
+// Coupon Routes (handles both admin and user endpoints)
+router.use('/', couponRouter);
 
 
 export default router;
+

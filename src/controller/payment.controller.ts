@@ -189,7 +189,19 @@ export const initiateCheckout = asyncHandler(async (req: Request, res: Response)
         email: user.email
     };
 
-    const result = await PaymentService.initiateCartCheckout(userId, userDetails);
+    // Optional coupon data from frontend (validated on frontend, will be re-validated)
+    let couponData: { couponCode: string; discountAmount: number; finalAmount?: number } | undefined;
+    if (req.body.couponCode) {
+        couponData = {
+            couponCode: String(req.body.couponCode),
+            discountAmount: Number(req.body.discountAmount) || 0
+        };
+        if (req.body.finalAmount) {
+            couponData.finalAmount = Number(req.body.finalAmount);
+        }
+    }
+
+    const result = await PaymentService.initiateCartCheckout(userId, userDetails, couponData);
 
     return res.status(200).json({
         success: true,

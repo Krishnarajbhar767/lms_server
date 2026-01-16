@@ -3,6 +3,7 @@ import { logger } from "../../config/logger.config";
 import { ValidationError, NotFoundError, InternalError } from "../../utils/api_error.utils";
 import { PaymentProvider } from "@prisma/client";
 import { getPaymentProvider, getActiveProviderName, getPaymentProviderByName } from "./payment.factory";
+import { consumeCoupon } from "../coupon.service";
 
 /**
  * 
@@ -294,6 +295,11 @@ export const verifyPaymentSignature = async (
                 });
                 logger.info(`[PaymentService] Removed course ${order.courseId} from cart for User:${userId}`);
             }
+
+            // E. Consume coupon if used (record usage, increment count)
+            if (order.couponCode) {
+                await consumeCoupon(order.couponCode, order.userId, order.id);
+            }
         });
 
         logger.info(`[PaymentService] Payment verified and enrollment created for User:${userId}`);
@@ -349,9 +355,11 @@ export const getActiveGateway = async () => {
  */
 export const initiateCartCheckout = async (
     userId: number,
-    userDetails: { name: string; email: string }
+    userDetails: { name: string; email: string },
+    couponData?: { couponCode: string; discountAmount: number; finalAmount?: number }
 ) => {
-    logger.info(`[PaymentService] Starting Cart Checkout - User:${userId}`);
+    logger.info(`[PaymentService] Starting Cart Checkout - User:${userId}${couponData ? `, Coupon:${couponData.couponCode}` : ""}`);
+
 
     // STEP 1: Get cart items
     const cart = await prisma.cart.findUnique({
@@ -430,8 +438,9 @@ export const initiateCartCheckout = async (
     logger.info(`[PaymentService] Cart checkout using: ${providerName}, Total: ₹${totalAmount}`);
 
     // STEP 6: Create orders for each course (PENDING)
+    // First order gets coupon data (cart-level discount applied to first order)
     const orders = await prisma.$transaction(
-        courses.map(course =>
+        courses.map((course, index) =>
             prisma.order.create({
                 data: {
                     userId,
@@ -439,17 +448,25 @@ export const initiateCartCheckout = async (
                     amount: course.price,
                     currency: "INR",
                     status: "PENDING",
-                    provider: providerName
+                    provider: providerName,
+                    // Coupon applied to first order only
+                    ...(index === 0 && couponData ? {
+                        couponCode: couponData.couponCode,
+                        discountAmount: couponData.discountAmount
+                    } : {})
                 }
             })
         )
     );
 
+    // Calculate actual payment amount (with coupon discount if applied)
+    const paymentAmount = couponData?.finalAmount ?? totalAmount;
+
     // STEP 7: Create ONE gateway order with total amount
     // Use first order ID as reference
     try {
         const gatewayResult = await paymentGateway.createOrder({
-            amount: totalAmount,
+            amount: paymentAmount, // Use discounted amount
             currency: "INR",
             orderId: orders[0]!.id,  // Non-null: orders always has items (validated above)
             courseId: courses[0]!.id, // Non-null: courses always has items (validated above)
@@ -591,6 +608,12 @@ export const verifyCartPayment = async (
             const userCart = await tx.cart.findUnique({ where: { userId } });
             if (userCart) {
                 await tx.cartItem.deleteMany({ where: { cartId: userCart.id } });
+            }
+
+            // Consume coupon if used on first order (cart-level coupon applied to first order)
+            const firstOrder = orders[0];
+            if (firstOrder?.couponCode) {
+                await consumeCoupon(firstOrder.couponCode, firstOrder.userId, firstOrder.id);
             }
         });
 

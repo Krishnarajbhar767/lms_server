@@ -260,6 +260,9 @@ model Order {
   provider       PaymentProvider
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @default(now()) @updatedAt
+  // Coupon fields (optional, null = no coupon used)
+  couponCode     String?
+  discountAmount Float?
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   course         Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
   payment        Payment?
@@ -267,6 +270,45 @@ model Order {
   @@index([userId, status])       // Hot path: "Get user pending orders"
   @@index([userId, createdAt])    // Hot path: "Purchase history sorted by date"
   @@index([courseId])             //"Course sales analytics"
+}
+
+// Coupon System Models
+
+model Coupon {
+  id                Int            @id @default(autoincrement())
+  code              String         @unique
+  discountType      DiscountType
+  discountValue     Float
+  maxDiscountAmount Float?
+  minOrderAmount    Float?
+  totalUsageLimit   Int?
+  perUserLimit      Int            @default(1)
+  usedCount         Int            @default(0)
+  validFrom         DateTime       @default(now())
+  validTill         DateTime?
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  usages            CouponUsage[]
+
+  @@index([code])
+  @@index([isActive, validTill])
+}
+
+model CouponUsage {
+  id        Int      @id @default(autoincrement())
+  couponId  Int
+  userId    Int
+  orderId   Int      @unique
+  usedAt    DateTime @default(now())
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Restrict)
+
+  @@index([couponId, userId])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
 }
 
 model AppSettings {
