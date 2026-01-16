@@ -131,7 +131,16 @@ export const login = asyncHandler(async (req: Request<{}, {}, LoginDTO>, res: Re
     });
 
     // step 6 : send response
-    res.success(`Welcome ${user.firstName}`, accessToken);
+    // Prepare safe user object (exclude password)
+    const userData = {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+    };
+
+    res.success(`Welcome ${user.firstName}`, { token: accessToken, user: userData });
 })
 
 export const refreshToken = asyncHandler(async (req: Request, res: Response) => {
