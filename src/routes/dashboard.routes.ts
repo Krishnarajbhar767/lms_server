@@ -22,3 +22,13 @@ dashboardRouter.get(
     isAdmin,
     getUserAnalytics
 );
+
+import { getCourseAnalytics } from "../controller/course-analytics.controller";
+
+// admin course specific analytics endpoint
+dashboardRouter.get(
+    "/courses/:courseId/analytics",
+    isAuthenticated,
+    isAdmin,
+    getCourseAnalytics
+);
