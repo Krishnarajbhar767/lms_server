@@ -260,6 +260,26 @@ export const forgotPasswordRequest = asyncHandler(async (req: Request<{}, {}, Fo
     if (user.isBlocked) {
         throw new ApiError(403, 'Your account has been blocked by the administrator. Please contact support.');
     }
+    
+    // check cooldown 5 minutes between requests
+    const normalizedEmail = email.toLowerCase();
+    const cooldownKey = FORGOT_PASSWORD_COOLDOWN_KEY + normalizedEmail;
+    const cooldownActive = await redis.get(cooldownKey);
+    if (cooldownActive) {
+        const ttl = await redis.ttl(cooldownKey);
+        const minutes = Math.ceil(ttl / 60);
+        throw new ApiError(429, `Please wait ${minutes} minutes before requesting another password reset email`);
+    }
+    
+    // check daily limit max 5 per day
+    const dailyKey = FORGOT_PASSWORD_DAILY_COUNT_KEY + normalizedEmail;
+    const dailyCount = await redis.get(dailyKey);
+    const count = dailyCount ? parseInt(dailyCount) : 0;
+    
+    if (count >= FORGOT_PASSWORD_DAILY_LIMIT) {
+        throw new ApiError(429, 'Daily limit reached. Please try again tomorrow');
+    }
+    
     // step 2 : generate forgot password token
     const passwordResetToken = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
@@ -275,6 +295,17 @@ export const forgotPasswordRequest = asyncHandler(async (req: Request<{}, {}, Fo
     const emailTemplate = forgotPasswordTemplate({ firstName: user.firstName, forgotPasswordLink });
     // step 6 : send forgot password email
     sendMail(user.email, 'Forgot Password', emailTemplate);
+    
+    // set 5 minute cooldown
+    await redis.set(cooldownKey, '1', 'EX', FORGOT_PASSWORD_COOLDOWN_SECONDS);
+    
+    // increment daily count
+    if (count === 0) {
+        await redis.set(dailyKey, '1', 'EX', FORGOT_PASSWORD_DAILY_TTL);
+    } else {
+        await redis.incr(dailyKey);
+    }
+    
     res.success('Forgot password email sent successfully');
 })
 
@@ -330,6 +361,12 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
     }
     res.success('User profile fetched successfully', data, 200);
 })
+
+const FORGOT_PASSWORD_COOLDOWN_KEY = 'forgot_cooldown:';
+const FORGOT_PASSWORD_DAILY_COUNT_KEY = 'forgot_daily:';
+const FORGOT_PASSWORD_COOLDOWN_SECONDS = 300; // 5 minutes
+const FORGOT_PASSWORD_DAILY_LIMIT = 5; // max 5 emails per day
+const FORGOT_PASSWORD_DAILY_TTL = 86400; // 24 hours
 
 const RESEND_COOLDOWN_KEY = 'resend_cooldown:';
 const RESEND_DAILY_COUNT_KEY = 'resend_daily:';
