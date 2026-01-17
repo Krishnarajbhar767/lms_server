@@ -3,7 +3,7 @@ import asyncHandler from "../utils/async_handler.utils";
 import { prisma } from "../prisma";
 import { getCache, setCache } from "../utils/cache";
 import { slugify } from "../utils/slugify.utils";
-import { DashboardAnalytics, MonthlyData, RecentOrder, QuizAnalytics, CourseQuizStats } from "./dashboard.controller";
+import { BaseDashboardAnalytics, MonthlyData, RecentOrder, QuizAnalytics, CourseQuizStats } from "./dashboard.controller";
 import { ApiError } from "../utils/api_error.utils";
 
 const USER_ANALYTICS_CACHE_TTL = 300; // 5 minutes
@@ -54,8 +54,8 @@ function generateLast30DaysArray(): string[] {
     return days;
 }
 
-// Extend DashboardAnalytics
-export interface UserDashboardAnalytics extends DashboardAnalytics {
+// Extend BaseDashboardAnalytics (without coupon analytics)
+export interface UserDashboardAnalytics extends BaseDashboardAnalytics {
     user: {
         id: number;
         firstName: string;
@@ -279,7 +279,9 @@ export const getUserAnalytics = asyncHandler(async (req: Request, res: Response)
         userEmail: order.user.email,
         amount: order.amount,
         status: order.status,
-        createdAt: order.createdAt
+        createdAt: order.createdAt,
+        couponCode: null,
+        discountAmount: null
     }));
 
     // Quiz Analytics

@@ -5,7 +5,7 @@ import { getCache, setCache, DASHBOARD_CACHE_KEY } from "../utils/cache";
 import { slugify } from "../utils/slugify.utils";
 
 const DASHBOARD_CACHE_TTL = 300;
-const CACHE_KEY_VERSION = "v2"; // Force refresh for new fields
+const CACHE_KEY_VERSION = "v3"; // Force refresh for coupon analytics
 
 export interface MonthlyData {
     month: string;
@@ -23,6 +23,8 @@ export interface RecentOrder {
     amount: number;
     status: string;
     createdAt: Date;
+    couponCode: string | null;
+    discountAmount: number | null;
 }
 
 export interface CourseQuizStats {
@@ -40,7 +42,22 @@ export interface QuizAnalytics {
     byCourse: CourseQuizStats[];
 }
 
-export interface DashboardAnalytics {
+export interface CouponAnalytics {
+    totalDiscountsGiven: number;
+    ordersWithCoupons: number;
+    ordersWithoutCoupons: number;
+    couponUsagePercentage: number;
+    topCoupons: Array<{
+        code: string;
+        usedCount: number;
+        discountType: string;
+        discountValue: number;
+    }>;
+    discountsByMonth: MonthlyData[];
+    discountsByDay: MonthlyData[];
+}
+
+export interface BaseDashboardAnalytics {
     totalUsers: number;
     totalStudents: number;
     totalCourses: number;
@@ -57,6 +74,10 @@ export interface DashboardAnalytics {
     certificatesByDay: MonthlyData[];
     recentOrders: RecentOrder[];
     quizAnalytics: QuizAnalytics;
+}
+
+export interface DashboardAnalytics extends BaseDashboardAnalytics {
+    couponAnalytics: CouponAnalytics;
 }
 
 function formatMonthYear(date: Date): string {
@@ -131,7 +152,12 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
         quizAttemptsByMonth, // Keep specific date-filtered fetch for charts
         quizCount,           // New: Global count
         quizAvg,             // New: Global average
-        quizGrouped          // New: Grouped by quizId
+        quizGrouped,         // New: Grouped by quizId
+        totalDiscounts,      // Coupon: Total discounts given
+        ordersWithCouponsCount,  // Coupon: Orders with coupons
+        ordersWithoutCouponsCount, // Coupon: Orders without coupons
+        topCoupons,          // Coupon: Most used coupons
+        ordersWithDiscounts  // Coupon: Orders with discounts for time aggregation
     ] = await prisma.$transaction([
         prisma.user.count(),
         prisma.user.count({ where: { role: "STUDENT" } }),
@@ -169,6 +195,8 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
                 createdAt: true,
                 courseId: true,
                 userId: true,
+                couponCode: true,
+                discountAmount: true,
                 course: { select: { title: true } },
                 user: { select: { firstName: true, lastName: true, email: true } }
             }
@@ -186,6 +214,45 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
             _count: { _all: true },
             _avg: { score: true },
             orderBy: { quizId: 'asc' }
+        }),
+        // Coupon analytics queries
+        prisma.order.aggregate({
+            where: { 
+                status: "COMPLETED",
+                discountAmount: { not: null }
+            },
+            _sum: { discountAmount: true }
+        }),
+        prisma.order.count({
+            where: { 
+                status: "COMPLETED",
+                couponCode: { not: null }
+            }
+        }),
+        prisma.order.count({
+            where: { 
+                status: "COMPLETED",
+                couponCode: null
+            }
+        }),
+        prisma.coupon.findMany({
+            where: { isActive: true },
+            select: {
+                code: true,
+                usedCount: true,
+                discountType: true,
+                discountValue: true
+            },
+            orderBy: { usedCount: 'desc' },
+            take: 5
+        }),
+        prisma.order.findMany({
+            where: {
+                status: "COMPLETED",
+                discountAmount: { not: null },
+                createdAt: { gte: twelveMonthsAgo }
+            },
+            select: { discountAmount: true, createdAt: true }
         })
     ]);
 
@@ -330,7 +397,9 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
         userEmail: order.user.email,
         amount: order.amount,
         status: order.status,
-        createdAt: order.createdAt
+        createdAt: order.createdAt,
+        couponCode: order.couponCode,
+        discountAmount: order.discountAmount
     }));
 
     // quiz analytics
@@ -428,6 +497,56 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
         byCourse
     };
 
+    // Coupon Analytics aggregation
+    const discountMap = new Map<string, number>();
+    monthsArray.forEach(month => discountMap.set(month, 0));
+
+    const discountDayMap = new Map<string, number>();
+    daysArray.forEach(day => discountDayMap.set(day, 0));
+
+    ordersWithDiscounts.forEach(order => {
+        const month = formatMonthYear(order.createdAt);
+        if (discountMap.has(month)) {
+            discountMap.set(month, (discountMap.get(month) || 0) + (order.discountAmount || 0));
+        }
+
+        if (order.createdAt >= thirtyDaysAgo) {
+            const day = formatDayMonth(order.createdAt);
+            if (discountDayMap.has(day)) {
+                discountDayMap.set(day, (discountDayMap.get(day) || 0) + (order.discountAmount || 0));
+            }
+        }
+    });
+
+    const discountsByMonth = monthsArray.map(month => ({
+        month,
+        value: discountMap.get(month) || 0
+    }));
+
+    const discountsByDay = daysArray.map(day => ({
+        month: day,
+        value: discountDayMap.get(day) || 0
+    }));
+
+    const totalOrders = ordersWithCouponsCount + ordersWithoutCouponsCount;
+
+    const couponAnalytics: CouponAnalytics = {
+        totalDiscountsGiven: totalDiscounts._sum.discountAmount || 0,
+        ordersWithCoupons: ordersWithCouponsCount,
+        ordersWithoutCoupons: ordersWithoutCouponsCount,
+        couponUsagePercentage: totalOrders > 0 
+            ? Math.round((ordersWithCouponsCount / totalOrders) * 100) 
+            : 0,
+        topCoupons: topCoupons.map(c => ({
+            code: c.code,
+            usedCount: c.usedCount,
+            discountType: c.discountType,
+            discountValue: c.discountValue
+        })),
+        discountsByMonth,
+        discountsByDay
+    };
+
     const analytics: DashboardAnalytics = {
         totalUsers,
         totalStudents,
@@ -444,7 +563,8 @@ export const getDashboardAnalytics = asyncHandler(async (req: Request, res: Resp
         certificatesByMonth,
         certificatesByDay,
         recentOrders,
-        quizAnalytics
+        quizAnalytics,
+        couponAnalytics
     };
 
     await setCache(`${DASHBOARD_CACHE_KEY}:${CACHE_KEY_VERSION}`, analytics, DASHBOARD_CACHE_TTL);
