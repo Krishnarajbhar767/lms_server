@@ -1,7 +1,7 @@
 export const COMPANY = {
-    name: "Majdari",
-    email: "info@yourcompany.com",
-    phone: "+1-800-000-0000",
+    name: "MS Majdari",
+    email: "info@msmajadari.xyz",
+    phone: "+91-9555565723",
     website: "https://msmajadari.xyz",
     address: {
         street: "123 Business Avenue",
@@ -12,12 +12,9 @@ export const COMPANY = {
     },
     about: 'We are a leading company in our industry, committed to providing quality services and products to our customers worldwide.',
     socialMedia: {
-        linkedin: "https://linkedin.com/company/yourcompany",
-        twitter: "https://twitter.com/yourcompany",
-        facebook: "https://facebook.com/yourcompany",
+        youtube: "https://www.youtube.com/@MSMajadari",
+        facebook: "https://facebook.com/share/16LcSWmxGC",
+        instagram: "https://www.instagram.com/mufti_saeed_majadari",
     },
-    logo: "/assets/logo.png",
-    tagline: "Your company tagline here",
-    founded: 2020,
-    employees: 50,
+    logo: "https://msmajadari.xyz/logo.png", // Full URL for email templates
 };
