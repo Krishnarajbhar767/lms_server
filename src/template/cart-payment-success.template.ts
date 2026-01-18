@@ -5,6 +5,7 @@ interface CartPurchaseItem {
     courseName: string;
     courseId: number;
     amount: number;
+    originalPrice?: number;
 }
 
 interface CartPaymentSuccessParams {
@@ -48,7 +49,11 @@ export const cartPaymentSuccessTemplate = (params: CartPaymentSuccessParams): st
     const dashboardUrl = `${COMPANY.website}/student/enrolled-courses`;
 
     // Generate course rows
-    const courseRows = items.map((item, index) => `
+    const courseRows = items.map((item, index) => {
+        const formattedAmount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: currency }).format(item.amount);
+        const formattedOriginal = item.originalPrice ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: currency }).format(item.originalPrice) : null;
+        
+        return `
         <tr>
             <td style="padding: 16px; border-bottom: 1px solid ${EMAIL_THEME.border};">
                 <span style="color: ${EMAIL_THEME.textMuted}; font-size: 13px;">${index + 1}</span>
@@ -60,12 +65,19 @@ export const cartPaymentSuccessTemplate = (params: CartPaymentSuccessParams): st
                 </a>
             </td>
             <td style="padding: 16px; border-bottom: 1px solid ${EMAIL_THEME.border}; text-align: right;">
-                <span style="color: ${EMAIL_THEME.textPrimary}; font-weight: 600;">
-                    ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: currency }).format(item.amount)}
-                </span>
+                <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                    <span style="color: ${EMAIL_THEME.textPrimary}; font-weight: 600;">
+                        ${formattedAmount}
+                    </span>
+                    ${(item.originalPrice && item.originalPrice > item.amount) ? `
+                    <span style="color: ${EMAIL_THEME.textMuted}; font-size: 11px; text-decoration: line-through;">
+                        ${formattedOriginal}
+                    </span>
+                    ` : ''}
+                </div>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 
     const content = `
         <div class="email-header">

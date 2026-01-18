@@ -64,7 +64,7 @@ export const verifyPayment = asyncHandler(async (req: Request, res: Response) =>
                         gatewayOrderId: req.body.razorpay_order_id,
                     },
                     include: {
-                        course: { select: { id: true, title: true } },
+                        course: { select: { id: true, title: true, price: true, originalPrice: true } },
                         user: { select: { firstName: true, email: true } },
                         payment: { select: { gatewayPaymentId: true } },
                     },
@@ -80,6 +80,9 @@ export const verifyPayment = asyncHandler(async (req: Request, res: Response) =>
                         orderId: order.gatewayOrderId || `ORD-${order.id}`,
                         paymentId: order.payment?.gatewayPaymentId || req.body.razorpay_payment_id || 'N/A',
                         purchaseDate: order.createdAt,
+                        originalPrice: order.originalPrice ?? order.course.originalPrice ?? order.course.price,
+                        discountAmount: order.discountAmount || 0,
+                        couponCode: order.couponCode || undefined,
                     });
 
                     await sendMail(
@@ -231,7 +234,7 @@ export const verifyCheckout = asyncHandler(async (req: Request, res: Response) =
                         status: 'COMPLETED',
                     },
                     include: {
-                        course: { select: { id: true, title: true } },
+                        course: { select: { id: true, title: true, price: true, originalPrice: true } },
                         user: { select: { firstName: true, email: true } },
                     },
                     orderBy: { createdAt: 'desc' },
@@ -243,6 +246,7 @@ export const verifyCheckout = asyncHandler(async (req: Request, res: Response) =
                         courseName: order.course.title,
                         courseId: order.course.id,
                         amount: order.amount,
+                        originalPrice: order.originalPrice ?? order.course.originalPrice ?? order.course.price,
                     }));
 
                     const totalAmount = orders.reduce((sum, o) => sum + o.amount, 0);
@@ -295,6 +299,8 @@ export const getPurchaseHistory = asyncHandler(async (req: Request, res: Respons
                     id: true,
                     title: true,
                     thumbnail: true,
+                    price: true,
+                    originalPrice: true,
                 }
             },
             payment: {

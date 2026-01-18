@@ -10,6 +10,9 @@ interface PaymentSuccessParams {
     orderId: string;
     paymentId: string;
     purchaseDate: Date;
+    originalPrice?: number;
+    discountAmount?: number;
+    couponCode?: string | undefined;
 }
 
 /**
@@ -26,12 +29,21 @@ export const paymentSuccessTemplate = (params: PaymentSuccessParams): string => 
         orderId,
         paymentId,
         purchaseDate,
+        originalPrice,
+        discountAmount,
+        couponCode
     } = params;
 
-    const formattedAmount = new Intl.NumberFormat('en-IN', {
+    const formatCurrency = (val: number) => new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency: currency,
-    }).format(amount);
+    }).format(val);
+
+    // Calculate actual amount paid (after coupon) with safety check
+    const actualPaid = Math.max(0, amount - (discountAmount || 0));
+    const formattedActualPaid = formatCurrency(actualPaid);
+    const formattedOriginalPrice = originalPrice ? formatCurrency(originalPrice) : null;
+    const formattedDiscount = discountAmount && discountAmount > 0 ? formatCurrency(discountAmount) : null;
 
     const formattedDate = purchaseDate.toLocaleDateString('en-IN', {
         year: 'numeric',
@@ -42,6 +54,43 @@ export const paymentSuccessTemplate = (params: PaymentSuccessParams): string => 
     });
 
     const courseUrl = `${COMPANY.website}/student/course/${courseId}/learn`;
+
+    // Pricing Breakdown Logic
+    let pricingRows = '';
+    
+    // 1. Original Price (if different from final amount)
+    if (formattedOriginalPrice && originalPrice && originalPrice > amount) {
+        pricingRows += `
+            <div class="info-row">
+                <span class="info-label">Original Price</span>
+                <span class="info-value" style="text-decoration: line-through; color: ${EMAIL_THEME.textMuted};">${formattedOriginalPrice}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Sale Price</span>
+                <span class="info-value">${formatCurrency(amount)}</span>
+            </div>
+        `;
+    }
+
+    // 2. Coupon Applied
+    if (couponCode) {
+        pricingRows += `
+            <div class="info-row">
+                <span class="info-label">Coupon Code</span>
+                <span class="info-value" style="color: ${EMAIL_THEME.accent}; font-weight: bold;">${couponCode}</span>
+            </div>
+        `;
+    }
+
+    // 3. Discount Amount
+    if (formattedDiscount) {
+         pricingRows += `
+            <div class="info-row">
+                <span class="info-label">Coupon Discount</span>
+                <span class="info-value" style="color: #10b981;">-${formattedDiscount}</span>
+            </div>
+        `;
+    }
 
     const content = `
         <div class="email-header">
@@ -77,10 +126,12 @@ export const paymentSuccessTemplate = (params: PaymentSuccessParams): string => 
                     <span class="info-label">Course</span>
                     <span class="info-value" style="color: ${EMAIL_THEME.accent};">${courseName}</span>
                 </div>
+
+                ${pricingRows}
                 
-                <div class="info-row">
-                    <span class="info-label">Amount Paid</span>
-                    <span class="info-value">${formattedAmount}</span>
+                <div class="info-row" style="border-top: 1px dashed ${EMAIL_THEME.border}; margin-top: 8px; padding-top: 8px;">
+                    <span class="info-label" style="font-weight: 700; color: ${EMAIL_THEME.textPrimary};">Total Paid</span>
+                    <span class="info-value" style="font-weight: 700; color: ${EMAIL_THEME.textPrimary}; font-size: 16px;">${formattedActualPaid}</span>
                 </div>
                 
                 <div class="info-row">

@@ -38,7 +38,7 @@ export const initiateBuyNowOrder = async (
     // STEP 1: Validate Course
     const course = await prisma.course.findUnique({
         where: { id: courseId },
-        select: { id: true, title: true, price: true, status: true }
+        select: { id: true, title: true, price: true, originalPrice: true, status: true }
     });
 
     if (!course) {
@@ -104,7 +104,8 @@ export const initiateBuyNowOrder = async (
             amount: course.price,
             currency: "INR",
             status: "PENDING",
-            provider: providerName
+            provider: providerName,
+            originalPrice: course.originalPrice || course.price
         }
     });
 
@@ -368,7 +369,7 @@ export const initiateCartCheckout = async (
             items: {
                 include: {
                     course: {
-                        select: { id: true, title: true, price: true, status: true }
+                        select: { id: true, title: true, price: true, originalPrice: true, status: true }
                     }
                 }
             }
@@ -449,6 +450,7 @@ export const initiateCartCheckout = async (
                     currency: "INR",
                     status: "PENDING",
                     provider: providerName,
+                    originalPrice: course.originalPrice || course.price,
                     // Coupon applied to first order only
                     ...(index === 0 && couponData ? {
                         couponCode: couponData.couponCode,
